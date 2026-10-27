@@ -22,6 +22,7 @@ dev = [
     "pytest-env>=1.8.1",
     "pytest-socket>=0.8.1",
     "ruff>=0.17.1",
+    "testcontainers[postgres]>=4.15.0",
 ]
 
 [tool.ruff]
@@ -50,6 +51,7 @@ addopts = [
     "--strict-markers",
     "-m",
     "not live",
+    "--allow-unix-socket",
 ]
 markers = [
     "live: calls real external services such as OpenAI; deselected by default",

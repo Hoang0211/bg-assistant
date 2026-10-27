@@ -37,8 +37,6 @@ jobs:
         run: uv sync --locked
       - name: Lint and type-check
         run: just lint-backend
-      - name: Apply migrations
-        run: just migrate
       - name: Test
         run: just test-backend
 

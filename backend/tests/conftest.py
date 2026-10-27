@@ -1,4 +1,5 @@
-from collections.abc import AsyncIterator, Iterator
+import asyncio
+from collections.abc import AsyncIterator, Callable, Iterator
 
 import pytest
 from httpx2 import ASGITransport, AsyncClient
@@ -20,3 +21,8 @@ def clear_dependency_overrides() -> Iterator[None]:
     """Remove any dependency overrides a test set, so they can't leak into the next test."""
     yield
     app.dependency_overrides.clear()
+
+
+def pytest_asyncio_loop_factories() -> dict[str, Callable[[], asyncio.AbstractEventLoop]]:
+    """Run async tests on a selector event loop, which async psycopg needs on Windows."""
+    return {"selector": asyncio.SelectorEventLoop}

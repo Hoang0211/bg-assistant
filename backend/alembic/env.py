@@ -11,7 +11,9 @@ from app.config import get_settings
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# Use the URL a caller passed in (the test fixture does), otherwise the app's settings.
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
