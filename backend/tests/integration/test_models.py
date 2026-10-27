@@ -1,4 +1,7 @@
+from typing import Any
+
 import pytest
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,8 +36,21 @@ async def test_new_game_and_rulebook_get_database_defaults(db_session: AsyncSess
     assert rulebook.status == RulebookStatus.UPLOADED
 
 
-async def test_max_players_below_min_players_is_rejected(db_session: AsyncSession) -> None:
-    db_session.add(Game(name="Game", min_players=4, max_players=2))
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"min_players": 4, "max_players": 2},
+        {"min_play_time_minutes": 60, "max_play_time_minutes": 30},
+        {"min_players": 0},
+        {"min_play_time_minutes": 0},
+        {"min_age": -1},
+    ],
+    ids=["players_range", "play_time_range", "min_players", "min_play_time", "min_age"],
+)
+async def test_invalid_numbers_are_rejected(
+    db_session: AsyncSession, fields: dict[str, Any]
+) -> None:
+    db_session.add(Game(name="Game", **fields))
     with pytest.raises(IntegrityError):
         await db_session.flush()
 
@@ -109,3 +125,19 @@ async def test_deleting_a_base_game_unlinks_its_expansion(db_session: AsyncSessi
     await db_session.refresh(expansion)
     assert expansion.base_game_id is None
     assert expansion.is_expansion is True
+
+
+async def test_unknown_rulebook_status_is_rejected(db_session: AsyncSession) -> None:
+    game = Game(name="Game")
+    db_session.add(game)
+    await db_session.flush()
+
+    with pytest.raises(IntegrityError):
+        await db_session.execute(
+            text(
+                "INSERT INTO rulebooks "
+                "(game_id, filename, storage_path, page_count, sha256, status) "
+                "VALUES (:game_id, 'rules.pdf', 'data/uploads/rules.pdf', 12, :sha256, 'archived')"
+            ),
+            {"game_id": game.id, "sha256": "b" * 64},
+        )
