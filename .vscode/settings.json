@@ -1,0 +1,23 @@
+{
+  "files.eol": "\n",
+  "[typescript][typescriptreact][javascript][json][css]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit",
+      "source.fixAll": "explicit"
+    }
+  },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml",
+    "editor.formatOnSave": true
+  },
+  "evenBetterToml.formatter.indentString": "    ",
+  "evenBetterToml.formatter.arrayAutoCollapse": false,
+  "python.terminal.activateEnvironment": false,
+  "js/ts.preferences.importModuleSpecifier": "non-relative"
+}

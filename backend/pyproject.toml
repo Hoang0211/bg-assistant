@@ -1,0 +1,72 @@
+[project]
+name = "bg-assistant-backend"
+version = "0.1.0"
+description = "Board game rules assistant: API and RAG engine"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.20.0",
+    "fastapi>=0.156.2",
+    "psycopg[binary]>=3.3.6",
+    "pydantic-settings>=2.16.1",
+    "sqlalchemy[asyncio]>=2.1.5",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.15.1",
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "pytest-env>=1.8.1",
+    "pytest-socket>=0.8.1",
+    "ruff>=0.17.1",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "I", "UP", "B", "SIM", "ASYNC", "INP"]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["app", "tests"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = [
+    "--allow-hosts=127.0.0.1,::1,localhost",
+    "--strict-markers",
+    "-m",
+    "not live",
+]
+markers = [
+    "live: calls real external services such as OpenAI; deselected by default",
+]
+env = [
+    "LLM_PROVIDER=fake",
+    "D:OPENAI_API_KEY=",
+    "LANGSMITH_TRACING=false",
+]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/**" = ["INP001"]

@@ -1,0 +1,69 @@
+name: bg-assistant
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: bg
+      POSTGRES_PASSWORD: bg
+      POSTGRES_DB: bg_assistant
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "bg", "-d", "bg_assistant"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  backend:
+    build: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://bg:bg@db:5432/bg_assistant
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:

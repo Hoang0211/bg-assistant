@@ -1,0 +1,74 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Board Game Assistant API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Get Health",
+        "description": "Report whether the API and its database are working; responds 503 when degraded.",
+        "operationId": "get_health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status",
+            "description": "`ok` when every dependency is reachable; `degraded` when any is not."
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unreachable"
+            ],
+            "title": "Database",
+            "description": "`ok` when the database answered a test query within 2 seconds; `unreachable` otherwise."
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "database"
+        ],
+        "title": "HealthResponse",
+        "description": "Result of the API health check."
+      }
+    }
+  }
+}

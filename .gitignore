@@ -1,0 +1,31 @@
+# Frontend: dependencies, build output, test artifacts
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+npm-debug.log*
+storybook-static/
+*storybook.log
+coverage/
+__screenshots__/
+test-results/
+playwright-report/
+blob-report/
+
+# Backend: virtual environment, caches, test artifacts
+.venv/
+__pycache__/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Backend runtime data (uploaded rulebook PDFs)
+backend/data/
+
+# Secrets: never commit real env files, only the documented templates
+.env
+.env.*
+!.env.example

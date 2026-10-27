@@ -1,0 +1,37 @@
+minimum_pre_commit_version: "4.4.0"
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        exclude: ^(backend/uv\.lock|frontend/package-lock\.json)$
+      - id: check-yaml
+
+  # Local hooks run the exact tool versions the project already locks.
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check (backend)
+        entry: uv run --project backend ruff check --fix
+        language: unsupported
+        types: [python]
+        files: ^backend/
+      - id: ruff-format
+        name: ruff format (backend)
+        entry: uv run --project backend ruff format
+        language: unsupported
+        types: [python]
+        files: ^backend/
+      - id: prettier
+        name: prettier (frontend)
+        entry: npm --prefix frontend run format
+        language: unsupported
+        files: ^frontend/
+        pass_filenames: false
+      - id: eslint
+        name: eslint (frontend)
+        entry: npm --prefix frontend run lint
+        language: unsupported
+        files: ^frontend/
+        pass_filenames: false

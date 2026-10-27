@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: bg
+          POSTGRES_PASSWORD: bg
+          POSTGRES_DB: bg_assistant
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bg -d bg_assistant"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.0"
+          enable-cache: true
+      - uses: extractions/setup-just@v4
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --locked
+      - name: Lint and type-check
+        run: just lint-backend
+      - name: Apply migrations
+        run: just migrate
+      - name: Test
+        run: just test-backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: extractions/setup-just@v4
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Chromium for the Storybook tests
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Lint, format check and type-check
+        run: just lint-frontend
+      - name: Test
+        run: just test-frontend
+      - name: Build the app
+        working-directory: frontend
+        run: npm run build
+      - name: Build Storybook
+        working-directory: frontend
+        run: npm run build-storybook
+
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: "0.13.0"
+          enable-cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: extractions/setup-just@v4
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Regenerate the API types
+        run: just gen-types
+      - name: Fail if the committed API types are out of date
+        run: git diff --exit-code -- frontend/openapi.json frontend/src/api/schema.d.ts
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: extractions/setup-just@v4
+      - name: Start the app in containers
+        run: just up
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run the end-to-end tests
+        run: just e2e
+      - name: Show container logs
+        if: failure()
+        run: docker compose logs
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-traces
+          path: frontend/test-results/

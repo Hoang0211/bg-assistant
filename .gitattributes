@@ -1,0 +1,5 @@
+# Detect text files and store them with LF endings; check out with LF on every OS
+* text=auto eol=lf
+
+# Never convert or text-diff PDFs (test fixtures)
+*.pdf binary

@@ -1,0 +1,19 @@
+# Build output
+.next/
+out/
+storybook-static/
+
+# Test output
+coverage/
+test-results/
+playwright-report/
+blob-report/
+
+# Generated files
+next-env.d.ts
+openapi.json
+/src/api/schema.d.ts
+public/mockServiceWorker.js
+
+# Written by npm
+package-lock.json
