@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import health
 from app.config import get_settings
-from app.db.session import create_db_engine
+from app.db.session import create_db_engine, create_sessionmaker
 
 
 @asynccontextmanager
@@ -16,6 +16,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
 
     app.state.engine = create_db_engine(settings)
+    app.state.sessionmaker = create_sessionmaker(app.state.engine)
 
     yield
     await app.state.engine.dispose()
