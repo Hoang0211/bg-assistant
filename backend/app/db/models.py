@@ -57,10 +57,10 @@ class Game(Base):
 
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)
+    is_expansion: Mapped[bool] = mapped_column(server_default=false())
     base_game_id: Mapped[int | None] = mapped_column(
         ForeignKey("games.id", ondelete="SET NULL"), index=True
     )
-    is_expansion: Mapped[bool] = mapped_column(server_default=false())
     min_players: Mapped[int | None]
     max_players: Mapped[int | None]
     min_age: Mapped[int | None]
@@ -74,12 +74,13 @@ class Game(Base):
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
-        CheckConstraint("base_game_id <> id", name="not_own_expansion"),
         CheckConstraint(
             "base_game_id IS NULL OR is_expansion", name="base_game_only_for_expansions"
         ),
+        CheckConstraint("base_game_id <> id", name="not_own_expansion"),
         CheckConstraint("min_players >= 1", name="min_players_positive"),
         CheckConstraint("max_players >= min_players", name="players_range"),
+        CheckConstraint("min_age >= 0", name="min_age_not_negative"),
         CheckConstraint("min_play_time_minutes >= 1", name="min_play_time_positive"),
         CheckConstraint("max_play_time_minutes >= min_play_time_minutes", name="play_time_range"),
     )
