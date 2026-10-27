@@ -81,7 +81,7 @@ bg-assistant/
 
 ## Data model
 
-- **Game:** id, name, description, min/max players, min age, play time (minutes), genres[], publisher, year, `base_game_id` (null for a base game; set for an expansion), timestamps. An expansion's base game must itself be a base game (one level only), and a game that has expansions can't become an expansion.
+- **Game:** id, name, description, min/max players, min age, min/max play time (minutes), genres[], publisher, year, `is_expansion`, `base_game_id` (the expansion's base game; null for base games and for expansions whose base game isn't in the library), timestamps. A base game can't have a `base_game_id`, an expansion's base game must itself be a base game (one level only), and a game that has expansions can't become an expansion. Deleting a base game unlinks its expansions (`ON DELETE SET NULL`) instead of deleting them.
 - **Rulebook:** id, game_id, filename, storage_path, page_count, `sha256` (unique; catches duplicate uploads), `status` (`uploaded` → `processing` → `ready` / `failed`), error, `parse_report` JSON (chunk count, pages with little text or mostly images).
 - **Chunk:** id, rulebook_id, game_id, `section_path` ("Setup > Market"), `chunk_type` (`section` / `table` / `glossary` / `faq`), page_start, page_end, content (prefixed with its section path, never the game name, so renaming a game needs no re-embedding), `tsv` (tsvector, GIN index), `embedding vector(768)` (HNSW index).
 - **Conversation:** id (also LangGraph's `thread_id`), title (the first message cut to about 60 characters, no LLM call; renamable), created_at, updated_at. Used to list chats in the sidebar.
@@ -154,7 +154,7 @@ START → router ─┬─ recommendation → extract_filters → query_games �
 ### Recommendation path (no RAG)
 
 1. The LLM extracts a `GameFilter`: `players`, `genres[]`, `max_play_time`, `min_age`, `include_expansions` (default false) and free-text `mood` keywords.
-2. `recommend.py` turns the filter into one SQLAlchemy query: player count within min/max, genre array overlap, play time limit, mood keywords via pg_trgm and full-text search over descriptions, ranked by how many criteria match.
+2. `recommend.py` turns the filter into one SQLAlchemy query: player count within min/max, genre array overlap, play time limit (which end of the min/max range to compare is decided in milestone 6), mood keywords via pg_trgm and full-text search over descriptions, ranked by how many criteria match.
 3. With no match, filters are relaxed one at a time (play time, then genre) and the answer says which. With no criteria at all, the `clarify` node asks, with quick options.
 4. The LLM explains each pick using only the returned rows, so it never invents games. A `recommendations` event sends game cards that link to each game.
 
