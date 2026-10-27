@@ -29,7 +29,8 @@ Run `just` to list everything. The main ones:
 - Chunk text is prefixed with its section path only, never the game name.
 - The frontend calls the backend only through the typed client in `frontend/src/api/client.ts`.
 - New engine commands (`test-live`, `add-game`, `reindex`, `eval`, `chat`) are added to the `justfile` in the milestone that builds them.
-- Commits follow Conventional Commits. Update the Progress section below at the end of every milestone, in that milestone's commit.
+- `main` is protected: every change goes through a pull request from a feature branch (e.g. `feat/games-api`), needs all four CI checks green, and is squash-merged. Pull request titles follow Conventional Commits, because they become the commit messages on `main`.
+- Update the Progress section below in the pull request that finishes each milestone.
 
 ## Gotchas
 
@@ -53,3 +54,4 @@ Run `just` to list everything. The main ones:
 - Milestone 7: the health status becomes a banner shown only on problems, with an adaptive polling interval and a request timeout; add a server-side API URL (`http://backend:8000` in compose) once Server Components call the API.
 - Milestone 8: e2e tests start writing data, so local `just e2e` should run against a throwaway stack (own compose project, no volume) instead of the dev database; otherwise junk accumulates and the `sha256` duplicate check fails on re-runs.
 - Phase B: add `error.tsx` boundaries; decide whether to enable `cacheComponents`.
+- Phase C: publish the static Storybook to GitHub Pages (a deploy job in CI) as a live demo link; it only uses MSW mock data.
