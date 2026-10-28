@@ -2,14 +2,15 @@ from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Game
+from app.errors import NotFoundError, RuleViolationError
 from app.schemas.games import GameCreate, GameUpdate
 
 
-class GameNotFoundError(Exception):
+class GameNotFoundError(NotFoundError):
     """Raised when no game has the requested id."""
 
 
-class InvalidExpansionError(Exception):
+class InvalidExpansionError(RuleViolationError):
     """Raised when a game's expansion link breaks a library rule."""
 
 
@@ -37,7 +38,7 @@ async def get_game(session: AsyncSession, game_id: int) -> Game:
     """Return the game with this id, or raise GameNotFoundError."""
     game = await session.get(Game, game_id)
     if game is None:
-        raise GameNotFoundError(game_id)
+        raise GameNotFoundError(f"game {game_id} does not exist")
     return game
 
 

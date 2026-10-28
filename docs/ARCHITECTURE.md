@@ -48,7 +48,9 @@ bg-assistant/
 │  │  ├─ main.py, config.py (pydantic-settings), export_openapi.py
 │  │  ├─ cli.py           add-game, chat and reindex commands for using the engine from a terminal
 │  │  ├─ tracing.py       LangSmith setup: wrapped OpenAI client, run metadata helpers
-│  │  ├─ api/             health.py, games.py, rulebooks.py, chat.py, deps.py
+│  │  ├─ errors.py        error kinds the services raise (NotFoundError, RuleViolationError), free of HTTP
+│  │  ├─ api/             health.py, games.py, rulebooks.py, chat.py, deps.py,
+│  │  │                   error_handlers.py (maps each error kind to one status: 404, 422)
 │  │  ├─ db/              session.py, models.py
 │  │  ├─ schemas/         Pydantic request and response models
 │  │  ├─ services/        games.py (game CRUD and the expansion rules); the API routes call these

@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health
+from app.api import games, health
+from app.api.error_handlers import register_error_handlers
 from app.config import get_settings
 from app.db.session import create_db_engine, create_sessionmaker
 
@@ -32,3 +33,6 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api")
+app.include_router(games.router, prefix="/api")
+
+register_error_handlers(app)
