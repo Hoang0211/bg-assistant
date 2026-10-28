@@ -1,6 +1,6 @@
 # Board Game Assistant
 
-A local-only RAG app: upload board game rulebooks, then ask rules questions with page citations or get recommendations from your library. Next.js frontend, FastAPI backend, Postgres + pgvector, OpenAI, LangGraph.
+A local-only RAG app: add board games with their rulebook PDFs, then ask rules questions with page citations or get recommendations from your library. Next.js frontend, FastAPI backend, Postgres + pgvector, OpenAI, LangGraph.
 
 The design (stack and reasons, data model, flows, chat graph, RAG pipeline, testing strategy, milestones) is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Read the relevant section before starting a milestone, and update it in the same change when a design decision changes.
 
@@ -30,7 +30,7 @@ Run `just` to list everything. The main ones:
 - Prompts are append-only: static system prompt and tools first, history never trimmed or rewritten (for OpenAI prompt caching).
 - Chunk text is prefixed with its section path only, never the game name.
 - The frontend calls the backend only through the typed client in `frontend/src/api/client.ts`.
-- New engine commands (`test-live`, `add-game`, `reindex`, `eval`, `chat`) are added to the `justfile` in the milestone that builds them.
+- New engine commands (`test-live`, `add-rulebook`, `reindex`, `eval`, `chat`) are added to the `justfile` in the milestone that builds them.
 - `main` is protected: every change goes through a pull request from a feature branch (e.g. `feat/games-api`), needs all four CI checks green, and is squash-merged. Pull request titles follow Conventional Commits, because they become the commit messages on `main`.
 - Update the Progress section below in the pull request that finishes each milestone.
 
@@ -45,17 +45,18 @@ Run `just` to list everything. The main ones:
 
 ## Progress
 
-**Current:** milestone 3 (upload and autofill API).
+**Current:** milestone 3 (rulebooks API).
 
 **Done:**
 - Milestone 1, scaffold: backend health check with DB status, first migration (pgvector, pg_trgm), test guards and coverage; frontend health page with generated types, Storybook (MSW, a11y, Vitest), Vitest unit tests, Playwright smoke test; Dockerfiles and compose; justfile; pre-commit; CI with backend, frontend, contract and e2e jobs.
 - Milestone 2, games data and API: `Game` and `Rulebook` models with CHECK constraints and their migrations; a games service with the expansion rules; `/api/games` CRUD with name, player, genre and base-game filters; error kinds mapped to 404 and 422; real-database tests with testcontainers and per-test rollback, for models, service and API.
 
 **Open notes:**
-- Milestone 3: create `backend/app/tracing.py` with the first LLM call; add `just test-live`.
 - Milestone 4: add the Hugging Face and Docling model cache to the CI backend and e2e jobs.
+- Milestone 6: create `backend/app/tracing.py` with the first LLM call (the router); add `just test-live`.
 - Milestone 7: the health status becomes a banner shown only on problems, with an adaptive polling interval and a request timeout; add a server-side API URL (`http://backend:8000` in compose) once Server Components call the API.
 - Milestone 8: the forms validate with zod before sending, so the server's 422s are a backstop. They come in two shapes: FastAPI's list of `{loc, msg, type}` for body, query and path validation (merged PATCH errors have no `"body"` in `loc`), and `{"detail": "message"}` for rule violations, which the UI must show.
 - Milestone 8: e2e tests start writing data, so local `just e2e` should run against a throwaway stack (own compose project, no volume) instead of the dev database; otherwise junk accumulates and the `sha256` duplicate check fails on re-runs.
+- Milestone 8: the PDF viewer needs CORS `expose_headers` for `Accept-Ranges` and `Content-Range`, or pdf.js downloads the whole file instead of using range requests.
 - Phase B: add `error.tsx` boundaries; decide whether to enable `cacheComponents`.
 - Phase C: publish the static Storybook to GitHub Pages (a deploy job in CI) as a live demo link; it only uses MSW mock data.
