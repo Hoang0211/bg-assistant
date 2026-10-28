@@ -24,10 +24,185 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Games
+         * @description Return the games matching every filter given, sorted by name.
+         */
+        get: operations["list_games_api_games_get"];
+        put?: never;
+        /**
+         * Create Game
+         * @description Create one game.
+         */
+        post: operations["create_game_api_games_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/games/{game_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Game
+         * @description Return one game.
+         */
+        get: operations["get_game_api_games__game_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Game
+         * @description Delete a game and its rulebooks; its expansions are kept and unlinked.
+         */
+        delete: operations["delete_game_api_games__game_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Game
+         * @description Change only the fields sent; the merged game is validated as a whole.
+         */
+        patch: operations["update_game_api_games__game_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * GameCreate
+         * @description Body for creating a game.
+         */
+        GameCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Is Expansion
+             * @description Whether this game is an expansion of another game.
+             * @default false
+             */
+            is_expansion: boolean;
+            /** Base Game Id */
+            base_game_id?: number | null;
+            /** Min Players */
+            min_players?: number | null;
+            /** Max Players */
+            max_players?: number | null;
+            /** Min Age */
+            min_age?: number | null;
+            /** Min Play Time Minutes */
+            min_play_time_minutes?: number | null;
+            /** Max Play Time Minutes */
+            max_play_time_minutes?: number | null;
+            /** Year */
+            year?: number | null;
+            /**
+             * Genres
+             * @description Genres, stored trimmed, lowercased and without duplicates.
+             * @default []
+             */
+            genres: string[];
+            /** Publisher */
+            publisher?: string | null;
+        };
+        /**
+         * GameRead
+         * @description A game as returned by the API.
+         */
+        GameRead: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Is Expansion
+             * @description Whether this game is an expansion of another game.
+             * @default false
+             */
+            is_expansion: boolean;
+            /** Base Game Id */
+            base_game_id?: number | null;
+            /** Min Players */
+            min_players?: number | null;
+            /** Max Players */
+            max_players?: number | null;
+            /** Min Age */
+            min_age?: number | null;
+            /** Min Play Time Minutes */
+            min_play_time_minutes?: number | null;
+            /** Max Play Time Minutes */
+            max_play_time_minutes?: number | null;
+            /** Year */
+            year?: number | null;
+            /**
+             * Genres
+             * @description Genres, stored trimmed, lowercased and without duplicates.
+             * @default []
+             */
+            genres: string[];
+            /** Publisher */
+            publisher?: string | null;
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * GameUpdate
+         * @description Body for changing some fields of a game; send only what changes.
+         */
+        GameUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Is Expansion */
+            is_expansion?: boolean | null;
+            /** Base Game Id */
+            base_game_id?: number | null;
+            /** Min Players */
+            min_players?: number | null;
+            /** Max Players */
+            max_players?: number | null;
+            /** Min Age */
+            min_age?: number | null;
+            /** Min Play Time Minutes */
+            min_play_time_minutes?: number | null;
+            /** Max Play Time Minutes */
+            max_play_time_minutes?: number | null;
+            /** Year */
+            year?: number | null;
+            /** Genres */
+            genres?: string[] | null;
+            /** Publisher */
+            publisher?: string | null;
+        };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
         /**
          * HealthResponse
          * @description Result of the API health check.
@@ -45,6 +220,19 @@ export interface components {
              * @enum {string}
              */
             database: "ok" | "unreachable";
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
     };
     responses: never;
@@ -80,6 +268,172 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    list_games_api_games_get: {
+        parameters: {
+            query?: {
+                /** @description Part of the game's name, in any case. */
+                q?: string | null;
+                /** @description Only games that support this many players. */
+                players?: number | null;
+                /** @description Only games with at least one of these genres. */
+                genres?: string[];
+                /** @description Only the expansions of this base game. */
+                base_game_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_game_api_games_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GameCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_game_api_games__game_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_game_api_games__game_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_game_api_games__game_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GameUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

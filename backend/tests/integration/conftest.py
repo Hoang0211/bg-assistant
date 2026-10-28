@@ -2,11 +2,14 @@ from collections.abc import AsyncIterator, Iterator
 
 import pytest
 from alembic.config import Config
+from httpx2 import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 from testcontainers.community.postgres import PostgresContainer
 
 from alembic import command
+from app.api.deps import get_session
+from app.main import app
 
 
 @pytest.fixture(scope="session")
@@ -42,3 +45,10 @@ async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
         finally:
             await session.close()
             await transaction.rollback()
+
+
+@pytest.fixture
+def api_client(client: AsyncClient, db_session: AsyncSession) -> AsyncClient:
+    """The HTTP client, with every request using the test's rolled-back session."""
+    app.dependency_overrides[get_session] = lambda: db_session
+    return client

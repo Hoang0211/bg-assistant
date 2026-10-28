@@ -21,6 +21,10 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 class Base(DeclarativeBase):
     """Base class for all ORM models; holds the shared table metadata."""
 
+    # Fetch database-computed values (like updated_at) with RETURNING after every INSERT and
+    # UPDATE, so reading them later never triggers a lazy load, which async sessions forbid.
+    __mapper_args__ = {"eager_defaults": True}
+
     metadata = MetaData(
         naming_convention={
             "ix": "ix_%(column_0_label)s",
