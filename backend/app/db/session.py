@@ -2,7 +2,12 @@ import asyncio
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.config import Settings
 
@@ -20,3 +25,8 @@ async def database_is_reachable(engine: AsyncEngine) -> bool:
     except (TimeoutError, SQLAlchemyError):
         return False
     return True
+
+
+def create_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    """Create the factory that opens a new session for each request."""
+    return async_sessionmaker(engine, expire_on_commit=False)

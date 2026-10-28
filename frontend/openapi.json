@@ -36,10 +36,746 @@
           }
         }
       }
+    },
+    "/api/games": {
+      "get": {
+        "tags": [
+          "games"
+        ],
+        "summary": "List Games",
+        "description": "Return the games matching every filter given, sorted by name.",
+        "operationId": "list_games_api_games_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Part of the game's name, in any case.",
+              "title": "Q"
+            },
+            "description": "Part of the game's name, in any case."
+          },
+          {
+            "name": "players",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only games that support this many players.",
+              "title": "Players"
+            },
+            "description": "Only games that support this many players."
+          },
+          {
+            "name": "genres",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Only games with at least one of these genres.",
+              "default": [],
+              "title": "Genres"
+            },
+            "description": "Only games with at least one of these genres."
+          },
+          {
+            "name": "base_game_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only the expansions of this base game.",
+              "title": "Base Game Id"
+            },
+            "description": "Only the expansions of this base game."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GameRead"
+                  },
+                  "title": "Response List Games Api Games Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Create Game",
+        "description": "Create one game.",
+        "operationId": "create_game_api_games_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/{game_id}": {
+      "get": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Get Game",
+        "description": "Return one game.",
+        "operationId": "get_game_api_games__game_id__get",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Update Game",
+        "description": "Change only the fields sent; the merged game is validated as a whole.",
+        "operationId": "update_game_api_games__game_id__patch",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Delete Game",
+        "description": "Delete a game and its rulebooks; its expansions are kept and unlinked.",
+        "operationId": "delete_game_api_games__game_id__delete",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "GameCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_expansion": {
+            "type": "boolean",
+            "title": "Is Expansion",
+            "description": "Whether this game is an expansion of another game.",
+            "default": false
+          },
+          "base_game_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The base game this expansion belongs to; only for expansions, and null while the base game isn't in the library."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Game Id"
+          },
+          "min_players": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Players"
+          },
+          "max_players": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Players"
+          },
+          "min_age": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Age"
+          },
+          "min_play_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Play Time Minutes"
+          },
+          "max_play_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Play Time Minutes"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Year of first publication."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "genres": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Genres",
+            "description": "Genres, stored trimmed, lowercased and without duplicates.",
+            "default": []
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "GameCreate",
+        "description": "Body for creating a game."
+      },
+      "GameRead": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_expansion": {
+            "type": "boolean",
+            "title": "Is Expansion",
+            "description": "Whether this game is an expansion of another game.",
+            "default": false
+          },
+          "base_game_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The base game this expansion belongs to; only for expansions, and null while the base game isn't in the library."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Game Id"
+          },
+          "min_players": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Players"
+          },
+          "max_players": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Players"
+          },
+          "min_age": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Age"
+          },
+          "min_play_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Play Time Minutes"
+          },
+          "max_play_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Play Time Minutes"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Year of first publication."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "genres": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Genres",
+            "description": "Genres, stored trimmed, lowercased and without duplicates.",
+            "default": []
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "GameRead",
+        "description": "A game as returned by the API."
+      },
+      "GameUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_expansion": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether this game is an expansion of another game."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Expansion"
+          },
+          "base_game_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The base game this expansion belongs to; only for expansions, and null while the base game isn't in the library."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Game Id"
+          },
+          "min_players": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Players"
+          },
+          "max_players": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Players"
+          },
+          "min_age": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Age"
+          },
+          "min_play_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Play Time Minutes"
+          },
+          "max_play_time_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Play Time Minutes"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Year of first publication."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "genres": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "description": "Genres, stored trimmed, lowercased and without duplicates."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genres"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GameUpdate",
+        "description": "Body for changing some fields of a game; send only what changes."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
       "HealthResponse": {
         "properties": {
           "status": {
@@ -68,6 +804,46 @@
         ],
         "title": "HealthResponse",
         "description": "Result of the API health check."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
       }
     }
   }

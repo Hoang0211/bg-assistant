@@ -24,6 +24,8 @@ Run `just` to list everything. The main ones:
 
 - Tests are written with each feature. A milestone is done only when its tests pass, CI is green and backend coverage stays at or above 80%. A bug gets a regression test first.
 - Tests never call real services: pytest forces `LLM_PROVIDER=fake`, clears `OPENAI_API_KEY` and blocks the network except localhost (see `[tool.pytest.ini_options]` in `backend/pyproject.toml`). Tests that need real OpenAI are marked `live` and only run with `just test-live`.
+- Database tests live in `backend/tests/integration/` and use the `db_session` fixture (or `api_client` for HTTP), whose changes are rolled back after each test. They need Docker running: testcontainers starts a throwaway pgvector container, never the dev database.
+- Services raise the error kinds in `backend/app/errors.py` (subclass `NotFoundError` or `RuleViolationError`), never `HTTPException`, so the CLI can reuse them; `backend/app/api/error_handlers.py` maps each kind to one status code.
 - Model names and tunables live in `backend/app/config.py`; `.env` holds only secrets and switches.
 - Prompts are append-only: static system prompt and tools first, history never trimmed or rewritten (for OpenAI prompt caching).
 - Chunk text is prefixed with its section path only, never the game name.
@@ -39,19 +41,21 @@ Run `just` to list everything. The main ones:
 - The justfile uses PowerShell 5.1 on Windows (no `&&`) and `sh` on Linux: keep recipe lines to one plain command each, and use `[working-directory]` instead of `cd`.
 - `astral-sh/setup-uv` publishes no floating major tag; pin an exact version in `.github/workflows/ci.yml`.
 - Compose needs v2.24+ (`env_file` with `required: false`).
+- Async sessions can't lazy-load: reading an expired attribute raises `MissingGreenlet`. `Base` in `backend/app/db/models.py` sets `eager_defaults=True` so database-computed values (like `updated_at`) come back with `RETURNING`; load relationships explicitly.
 
 ## Progress
 
-**Current:** milestone 2 (games data and API).
+**Current:** milestone 3 (upload and autofill API).
 
 **Done:**
 - Milestone 1, scaffold: backend health check with DB status, first migration (pgvector, pg_trgm), test guards and coverage; frontend health page with generated types, Storybook (MSW, a11y, Vitest), Vitest unit tests, Playwright smoke test; Dockerfiles and compose; justfile; pre-commit; CI with backend, frontend, contract and e2e jobs.
+- Milestone 2, games data and API: `Game` and `Rulebook` models with CHECK constraints and their migrations; a games service with the expansion rules; `/api/games` CRUD with name, player, genre and base-game filters; error kinds mapped to 404 and 422; real-database tests with testcontainers and per-test rollback, for models, service and API.
 
 **Open notes:**
-- Milestone 2: configure pytest-asyncio to use the selector event loop on Windows before the first real-DB test; add testcontainers and real-DB tests for `database_is_reachable` in `backend/app/db/session.py`.
 - Milestone 3: create `backend/app/tracing.py` with the first LLM call; add `just test-live`.
 - Milestone 4: add the Hugging Face and Docling model cache to the CI backend and e2e jobs.
 - Milestone 7: the health status becomes a banner shown only on problems, with an adaptive polling interval and a request timeout; add a server-side API URL (`http://backend:8000` in compose) once Server Components call the API.
+- Milestone 8: the forms validate with zod before sending, so the server's 422s are a backstop. They come in two shapes: FastAPI's list of `{loc, msg, type}` for body, query and path validation (merged PATCH errors have no `"body"` in `loc`), and `{"detail": "message"}` for rule violations, which the UI must show.
 - Milestone 8: e2e tests start writing data, so local `just e2e` should run against a throwaway stack (own compose project, no volume) instead of the dev database; otherwise junk accumulates and the `sha256` duplicate check fails on re-runs.
 - Phase B: add `error.tsx` boundaries; decide whether to enable `cacheComponents`.
 - Phase C: publish the static Storybook to GitHub Pages (a deploy job in CI) as a live demo link; it only uses MSW mock data.

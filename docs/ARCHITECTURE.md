@@ -48,9 +48,12 @@ bg-assistant/
 │  │  ├─ main.py, config.py (pydantic-settings), export_openapi.py
 │  │  ├─ cli.py           add-game, chat and reindex commands for using the engine from a terminal
 │  │  ├─ tracing.py       LangSmith setup: wrapped OpenAI client, run metadata helpers
-│  │  ├─ api/             health.py, games.py, rulebooks.py, chat.py, deps.py
+│  │  ├─ errors.py        error kinds the services raise (NotFoundError, RuleViolationError), free of HTTP
+│  │  ├─ api/             health.py, games.py, rulebooks.py, chat.py, deps.py,
+│  │  │                   error_handlers.py (maps each error kind to one status: 404, 422)
 │  │  ├─ db/              session.py, models.py
 │  │  ├─ schemas/         Pydantic request and response models
+│  │  ├─ services/        games.py (game CRUD and the expansion rules); the API routes call these
 │  │  ├─ llm/             base.py (LLMProvider protocol), openai.py, fake.py
 │  │  ├─ ingestion/       quick_text.py (PyMuPDF), layout_parser.py (Docling → typed elements),
 │  │  │                   chunker.py, embedder.py, quality.py (parse report), pipeline.py, jobs.py
@@ -81,7 +84,7 @@ bg-assistant/
 
 ## Data model
 
-- **Game:** id, name, description, min/max players, min age, min/max play time (minutes), genres[], publisher, year, `is_expansion`, `base_game_id` (the expansion's base game; null for base games and for expansions whose base game isn't in the library), timestamps. A base game can't have a `base_game_id`, an expansion's base game must itself be a base game (one level only), and a game that has expansions can't become an expansion. Deleting a base game unlinks its expansions (`ON DELETE SET NULL`) instead of deleting them.
+- **Game:** id, name, description, min/max players, min age, min/max play time (minutes), genres[], publisher, year, `is_expansion`, `base_game_id` (the expansion's base game; null for base games and for expansions whose base game isn't in the library), timestamps. A base game can't have a `base_game_id`, an expansion's base game must itself be a base game (one level only), and a game that has expansions can't become an expansion. Rules about a single row (the ranges, a base game with no `base_game_id`) are CHECK constraints; rules that look at another game are checked in `services/games.py`, because a CHECK can only see its own row. Deleting a base game unlinks its expansions (`ON DELETE SET NULL`) instead of deleting them.
 - **Rulebook:** id, game_id, filename, storage_path, page_count, `sha256` (unique; catches duplicate uploads), `status` (`uploaded` → `processing` → `ready` / `failed`), error, `parse_report` JSON (chunk count, pages with little text or mostly images).
 - **Chunk:** id, rulebook_id, game_id, `section_path` ("Setup > Market"), `chunk_type` (`section` / `table` / `glossary` / `faq`), page_start, page_end, content (prefixed with its section path, never the game name, so renaming a game needs no re-embedding), `tsv` (tsvector, GIN index), `embedding vector(768)` (HNSW index).
 - **Conversation:** id (also LangGraph's `thread_id`), title (the first message cut to about 60 characters, no LLM call; renamable), created_at, updated_at. Used to list chats in the sidebar.
@@ -119,7 +122,7 @@ Modelling expansions as child games lets chat scope retrieval to a base game plu
 
 ## Flow 2: Manage games
 
-- `GET /api/games` (search and filter); `GET/PATCH/DELETE /api/games/{id}`. Deleting cascades to rulebooks and chunks and removes the stored file.
+- `GET /api/games` with optional filters, all of which must match: `q` (part of the name, any case), `players` (games known to support that many; unknown counts are excluded), `genres` (any of those given) and `base_game_id` (that game's expansions). `GET/PATCH/DELETE /api/games/{id}`. Deleting cascades to rulebooks and chunks and removes the stored file.
 - `POST /api/games/{id}/rulebooks` adds or replaces a rulebook and re-ingests it.
 - Ingestion runs once per rulebook; chat only embeds the question. The embedding and reranker models load once at backend startup.
 - `just reindex [--game <id>]` re-runs parse → chunk → embed from the stored PDFs, for one game or all, after a chunker or embedding change. Each rulebook's chunks are replaced in one transaction, so a failure keeps the old chunks.
@@ -218,7 +221,7 @@ Tests are written with each feature, not at the end. A milestone is done only wh
 - **just** is the single entry point for every command, locally and in CI.
 - **pre-commit** runs Ruff, Prettier and ESLint as local hooks, using the exact tool versions in the lock files, plus YAML and large-file checks.
 - **CI (`ci.yml`)** runs four jobs on every pull request and every push to `main`:
-  1. **backend:** `uv sync --locked`, Ruff, mypy, migrations on a fresh pgvector service container, pytest with coverage
+  1. **backend:** `uv sync --locked`, Ruff, mypy, pytest with coverage (the integration tests start their own pgvector container with testcontainers and run the migrations in it)
   2. **frontend:** `npm ci`, ESLint, Prettier, tsc, Vitest (unit and story tests), the Next.js build and the Storybook build
   3. **contract:** regenerate the OpenAPI schema and TypeScript types and fail if they differ from the committed ones
   4. **e2e:** start the app in containers, run Playwright, and on failure print container logs and upload traces
