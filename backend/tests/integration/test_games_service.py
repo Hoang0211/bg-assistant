@@ -3,7 +3,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Game
-from app.schemas.games import GameCreate, GameUpdate
+from app.schemas.games import GameCreate, GameFilters, GameUpdate
 from app.services.games import (
     GameNotFoundError,
     InvalidExpansionError,
@@ -78,9 +78,86 @@ async def test_list_games_sorts_by_name(db_session: AsyncSession) -> None:
     await add_game(db_session, name="Game C")
     await add_game(db_session, name="Game B")
 
-    games = await list_games(db_session)
+    games = await list_games(db_session, GameFilters())
 
     assert [game.name for game in games] == ["Game A", "Game B", "Game C"]
+
+
+async def test_list_games_searches_names_in_any_case(db_session: AsyncSession) -> None:
+    await add_game(db_session, name="Game one")
+    await add_game(db_session, name="Game two")
+    await add_game(db_session, name="Game three")
+
+    games = await list_games(db_session, GameFilters(q="THREE"))
+
+    assert [game.name for game in games] == ["Game three"]
+
+
+async def test_list_games_treats_wildcards_in_the_search_literally(
+    db_session: AsyncSession,
+) -> None:
+    await add_game(db_session, name="Game")
+    await add_game(db_session, name="Game %")
+
+    games = await list_games(db_session, GameFilters(q="%"))
+
+    assert [game.name for game in games] == ["Game %"]
+
+
+@pytest.mark.parametrize("players", [2, 3, 4])
+async def test_list_games_filters_by_player_count_including_the_edges(
+    db_session: AsyncSession, players: int
+) -> None:
+    await add_game(db_session, name="Game 1", min_players=2, max_players=4)
+    await add_game(db_session, name="Game 2", min_players=5, max_players=8)
+
+    games = await list_games(db_session, GameFilters(players=players))
+
+    assert [game.name for game in games] == ["Game 1"]
+
+
+async def test_list_games_player_filter_excludes_unknown_counts(
+    db_session: AsyncSession,
+) -> None:
+    await add_game(db_session, name="Game 1")
+    await add_game(db_session, name="Game 2", min_players=5, max_players=8)
+
+    games = await list_games(db_session, GameFilters(players=7))
+
+    assert [game.name for game in games] == ["Game 2"]
+
+
+async def test_list_games_filters_by_any_of_the_genres(
+    db_session: AsyncSession,
+) -> None:
+    await add_game(db_session, name="Game 1", genres=["party"])
+    await add_game(db_session, name="Game 2", genres=["co-op"])
+    await add_game(db_session, name="Game 3", genres=["zombie"])
+
+    games = await list_games(db_session, GameFilters(genres=["  Party  ", "CO-OP"]))
+
+    assert [game.name for game in games] == ["Game 1", "Game 2"]
+
+
+async def test_list_games_filters_by_base_game(db_session: AsyncSession) -> None:
+    game_base_1 = await add_game(db_session, name="Game 1")
+    game_base_2 = await add_game(db_session, name="Game 2")
+    await add_game(db_session, name="Expansion 1", is_expansion=True, base_game_id=game_base_1.id)
+    await add_game(db_session, name="Expansion 2", is_expansion=True, base_game_id=game_base_2.id)
+
+    games = await list_games(db_session, GameFilters(base_game_id=game_base_1.id))
+
+    assert [game.name for game in games] == ["Expansion 1"]
+
+
+async def test_list_games_requires_every_filter_to_match(db_session: AsyncSession) -> None:
+    await add_game(db_session, name="Game 1", min_players=2, max_players=4, genres=["party"])
+    await add_game(db_session, name="Game 2", min_players=5, max_players=8, genres=["party"])
+    await add_game(db_session, name="Game 3", min_players=2, max_players=4, genres=["zombie"])
+
+    games = await list_games(db_session, GameFilters(players=3, genres=["party"]))
+
+    assert [game.name for game in games] == ["Game 1"]
 
 
 async def test_update_game_changes_only_the_fields_sent(db_session: AsyncSession) -> None:

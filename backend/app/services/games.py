@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Game
 from app.errors import NotFoundError, RuleViolationError
-from app.schemas.games import GameCreate, GameUpdate
+from app.schemas.games import GameCreate, GameFilters, GameUpdate
 
 
 class GameNotFoundError(NotFoundError):
@@ -42,9 +42,22 @@ async def get_game(session: AsyncSession, game_id: int) -> Game:
     return game
 
 
-async def list_games(session: AsyncSession) -> list[Game]:
-    """Return every game in the library, sorted by name."""
-    result = await session.scalars(select(Game).order_by(Game.name))
+async def list_games(session: AsyncSession, filters: GameFilters) -> list[Game]:
+    """Return the games matching every filter given, sorted by name."""
+
+    statement = select(Game).order_by(Game.name)
+    if filters.q:
+        statement = statement.where(Game.name.icontains(filters.q, autoescape=True))
+    if filters.players is not None:
+        statement = statement.where(
+            Game.min_players <= filters.players, Game.max_players >= filters.players
+        )
+    if filters.genres:
+        statement = statement.where(Game.genres.overlap(filters.genres))
+    if filters.base_game_id is not None:
+        statement = statement.where(Game.base_game_id == filters.base_game_id)
+
+    result = await session.scalars(statement)
     return list(result.all())
 
 

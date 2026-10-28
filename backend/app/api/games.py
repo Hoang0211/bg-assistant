@@ -1,18 +1,22 @@
-from fastapi import APIRouter, status
+from typing import Annotated
+
+from fastapi import APIRouter, Query, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
 from app.api.deps import SessionDep
-from app.schemas.games import GameCreate, GameRead, GameUpdate
+from app.schemas.games import GameCreate, GameFilters, GameRead, GameUpdate
 from app.services import games as games_service
 
 router = APIRouter(prefix="/games", tags=["games"])
 
 
 @router.get("")
-async def list_games(session: SessionDep) -> list[GameRead]:
-    """Return every game, sorted by name."""
-    games = await games_service.list_games(session)
+async def list_games(
+    filters: Annotated[GameFilters, Query()], session: SessionDep
+) -> list[GameRead]:
+    """Return the games matching every filter given, sorted by name."""
+    games = await games_service.list_games(session, filters)
     return [GameRead.model_validate(game) for game in games]
 
 

@@ -34,7 +34,7 @@ Genres = Annotated[
 class GameCreate(BaseModel):
     """Body for creating a game."""
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     name: GameName
     description: str | None = None
@@ -75,7 +75,7 @@ class GameCreate(BaseModel):
 class GameUpdate(BaseModel):
     """Body for changing some fields of a game; send only what changes."""
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     name: GameName | None = None
     description: str | None = None
@@ -99,3 +99,18 @@ class GameRead(GameCreate):
     id: int
     created_at: datetime
     updated_at: datetime
+
+
+class GameFilters(BaseModel):
+    """Optional filters for the game list; all of them must match."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    q: str | None = Field(default=None, description="Part of the game's name, in any case.")
+    players: Count | None = Field(
+        default=None, description="Only games that support this many players."
+    )
+    genres: Genres = Field(default=[], description="Only games with at least one of these genres.")
+    base_game_id: int | None = Field(
+        default=None, description="Only the expansions of this base game."
+    )

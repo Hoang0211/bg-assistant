@@ -122,7 +122,7 @@ Modelling expansions as child games lets chat scope retrieval to a base game plu
 
 ## Flow 2: Manage games
 
-- `GET /api/games` (search and filter); `GET/PATCH/DELETE /api/games/{id}`. Deleting cascades to rulebooks and chunks and removes the stored file.
+- `GET /api/games` with optional filters, all of which must match: `q` (part of the name, any case), `players` (games known to support that many; unknown counts are excluded), `genres` (any of those given) and `base_game_id` (that game's expansions). `GET/PATCH/DELETE /api/games/{id}`. Deleting cascades to rulebooks and chunks and removes the stored file.
 - `POST /api/games/{id}/rulebooks` adds or replaces a rulebook and re-ingests it.
 - Ingestion runs once per rulebook; chat only embeds the question. The embedding and reranker models load once at backend startup.
 - `just reindex [--game <id>]` re-runs parse → chunk → embed from the stored PDFs, for one game or all, after a chunker or embedding change. Each rulebook's chunks are replaced in one transaction, so a failure keeps the old chunks.
