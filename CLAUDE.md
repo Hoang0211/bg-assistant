@@ -46,11 +46,12 @@ Run `just` to list everything. The main ones:
 
 ## Progress
 
-**Current:** milestone 3 (rulebooks API).
+**Current:** milestone 4 (ingestion).
 
 **Done:**
 - Milestone 1, scaffold: backend health check with DB status, first migration (pgvector, pg_trgm), test guards and coverage; frontend health page with generated types, Storybook (MSW, a11y, Vitest), Vitest unit tests, Playwright smoke test; Dockerfiles and compose; justfile; pre-commit; CI with backend, frontend, contract and e2e jobs.
 - Milestone 2, games data and API: `Game` and `Rulebook` models with CHECK constraints and their migrations; a games service with the expansion rules; `/api/games` CRUD with name, player, genre and base-game filters; error kinds mapped to 404 and 422; real-database tests with testcontainers and per-test rollback, for models, service and API.
+- Milestone 3, rulebooks API: rulebooks managed apart from games (several per game, or none); PDF uploads checked for size (413), duplicates across the library by `sha256` (422 with `duplicate_of`) and readability with PyMuPDF, which also reads the page count; files stored as `{sha256}.pdf`, written before the row and removed after a delete commits; list, rename, move and delete; the file download with range requests for the PDF viewer; service and API tests.
 
 **Open notes:**
 - Milestone 4: add the Hugging Face and Docling model cache to the CI backend and e2e jobs.
