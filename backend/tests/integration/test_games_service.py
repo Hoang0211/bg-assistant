@@ -16,7 +16,7 @@ from app.services.games import (
     update_game,
 )
 from app.services.rulebooks import add_rulebook
-from tests.pdfs import make_pdf
+from tests.helpers import make_pdf
 
 
 async def add_game(session: AsyncSession, **fields: object) -> Game:
@@ -245,14 +245,9 @@ async def test_delete_game_removes_the_file_of_this_game_only(
 ) -> None:
     game_1 = await add_game(db_session, name="Game 1")
     game_2 = await add_game(db_session, name="Game 2")
-
-    data_1 = make_pdf(1)
-    data_2 = make_pdf(1)
-    data_3 = make_pdf(1)
-
-    kept = await add_rulebook(db_session, game_1, "rules_1.pdf", data_1, tmp_path)
-    await add_rulebook(db_session, game_2, "rules_2.pdf", data_2, tmp_path)
-    await add_rulebook(db_session, game_2, "rules_3.pdf", data_3, tmp_path)
+    kept = await add_rulebook(db_session, game_1, "rules_1.pdf", make_pdf(1), tmp_path)
+    await add_rulebook(db_session, game_2, "rules_2.pdf", make_pdf(1), tmp_path)
+    await add_rulebook(db_session, game_2, "rules_3.pdf", make_pdf(1), tmp_path)
 
     await delete_game(db_session, game_2, tmp_path)
 

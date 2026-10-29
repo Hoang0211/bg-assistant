@@ -25,7 +25,8 @@ Run `just` to list everything. The main ones:
 - Tests are written with each feature. A milestone is done only when its tests pass, CI is green and backend coverage stays at or above 80%. A bug gets a regression test first.
 - Tests never call real services: pytest forces `LLM_PROVIDER=fake`, clears `OPENAI_API_KEY` and blocks the network except localhost (see `[tool.pytest.ini_options]` in `backend/pyproject.toml`). Tests that need real OpenAI are marked `live` and only run with `just test-live`.
 - Database tests live in `backend/tests/integration/` and use the `db_session` fixture (or `api_client` for HTTP), whose changes are rolled back after each test. They need Docker running: testcontainers starts a throwaway pgvector container, never the dev database.
-- Services raise the error kinds in `backend/app/errors.py` (subclass `NotFoundError` or `RuleViolationError`), never `HTTPException`, so the CLI can reuse them; `backend/app/api/error_handlers.py` maps each kind to one status code.
+- Services raise the error kinds in `backend/app/errors.py` (subclass `NotFoundError`, `RuleViolationError` or `TooLargeError`), never `HTTPException`, so the CLI can reuse them; `backend/app/api/error_handlers.py` maps each kind to one status code.
+- Routes in each `backend/app/api/` file, and their API tests, are grouped by URL in the order `/docs` shows them, and within a URL go GET, POST, PATCH, DELETE. Within each route's tests, success comes first, then errors by status code.
 - Model names and tunables live in `backend/app/config.py`; `.env` holds only secrets and switches.
 - Prompts are append-only: static system prompt and tools first, history never trimmed or rewritten (for OpenAI prompt caching).
 - Chunk text is prefixed with its section path only, never the game name.
@@ -53,6 +54,8 @@ Run `just` to list everything. The main ones:
 
 **Open notes:**
 - Milestone 4: add the Hugging Face and Docling model cache to the CI backend and e2e jobs.
+- Milestone 4: configure logging at startup (`logging.basicConfig` in `main.py`) for the ingestion job's progress logs. Until then only warnings and errors print, through Python's fallback handler.
+- Milestone 4: once ingestion and `reindex` also read stored PDFs, move the file helpers (`_write_file`, `remove_files`) from `services/rulebooks.py` into an `app/storage.py` that turns a `storage_path` into a real path in one place.
 - Milestone 6: create `backend/app/tracing.py` with the first LLM call (the router); add `just test-live`.
 - Milestone 7: the health status becomes a banner shown only on problems, with an adaptive polling interval and a request timeout; add a server-side API URL (`http://backend:8000` in compose) once Server Components call the API.
 - Milestone 8: the forms validate with zod before sending, so the server's 422s are a backstop. They come in two shapes: FastAPI's list of `{loc, msg, type}` for body, query and path validation (merged PATCH errors have no `"body"` in `loc`), and `{"detail": "message"}` for rule violations, which the UI must show.

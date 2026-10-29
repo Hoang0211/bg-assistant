@@ -7,12 +7,17 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db.models import Game, Rulebook
-from app.errors import NotFoundError, RuleViolationError
+from app.errors import NotFoundError, RuleViolationError, TooLargeError
 from app.ingestion.pdf_info import read_page_count
 from app.schemas.rulebooks import RulebookUpdate
 
 logger = logging.getLogger(__name__)
+
+
+class RulebookTooLargeError(TooLargeError):
+    """Raised when an uploaded PDF is over max_upload_mb."""
 
 
 class RulebookNotFoundError(NotFoundError):
@@ -45,6 +50,10 @@ async def add_rulebook(
     session: AsyncSession, game: Game, filename: str, data: bytes, upload_dir: Path
 ) -> Rulebook:
     """Store a PDF as one of the game's rulebooks; nothing is kept if any step fails."""
+    max_upload_mb = get_settings().max_upload_mb
+    if len(data) > max_upload_mb * 1024 * 1024:
+        raise RulebookTooLargeError(f"the PDF is over {max_upload_mb} MB")
+
     sha256 = hashlib.sha256(data).hexdigest()
 
     existing = (
@@ -75,7 +84,7 @@ async def add_rulebook(
 
     rulebook = Rulebook(
         game_id=game.id,
-        filename=filename,
+        filename=filename[:255],
         storage_path=storage_path,
         page_count=page_count,
         sha256=sha256,

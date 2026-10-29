@@ -1,13 +1,6 @@
-from typing import Any
-
 from httpx2 import AsyncClient
 
-
-async def post_game(client: AsyncClient, **fields: object) -> dict[str, Any]:
-    response = await client.post("/api/games", json={"name": "Game", **fields})
-    assert response.status_code == 201
-    body: dict[str, Any] = response.json()
-    return body
+from tests.helpers import post_game
 
 
 async def test_list_games_applies_the_query_filters(api_client: AsyncClient) -> None:

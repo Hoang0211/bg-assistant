@@ -1,6 +1,23 @@
+from datetime import datetime
 from typing import Annotated, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.db.models import RulebookStatus
+
+
+class RulebookRead(BaseModel):
+    """A rulebook as returned by the API, with its game's current name."""
+
+    id: int
+    game_id: int
+    game_name: str
+    filename: str
+    page_count: int
+    status: RulebookStatus
+    error: str | None
+    created_at: datetime
+    updated_at: datetime
 
 
 class RulebookUpdate(BaseModel):

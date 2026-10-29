@@ -8,3 +8,7 @@ class RuleViolationError(Exception):
     def __init__(self, message: str, **extra: object) -> None:
         super().__init__(message)
         self.extra = extra
+
+
+class TooLargeError(Exception):
+    """The upload is over the size limit; the API responds 413."""

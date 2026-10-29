@@ -2,7 +2,7 @@ import pytest
 from pymupdf import mupdf
 
 from app.ingestion.pdf_info import InvalidPdfError, read_page_count
-from tests.pdfs import make_pdf
+from tests.helpers import make_pdf
 
 
 def test_read_page_count_returns_the_number_of_pages() -> None:

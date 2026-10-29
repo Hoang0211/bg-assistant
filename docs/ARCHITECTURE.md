@@ -48,9 +48,9 @@ bg-assistant/
 │  │  ├─ main.py, config.py (pydantic-settings), export_openapi.py
 │  │  ├─ cli.py           add-rulebook, chat and reindex commands for using the engine from a terminal
 │  │  ├─ tracing.py       LangSmith setup: wrapped OpenAI client, run metadata helpers
-│  │  ├─ errors.py        error kinds the services raise (NotFoundError, RuleViolationError), free of HTTP
+│  │  ├─ errors.py        error kinds the services raise (NotFoundError, RuleViolationError, TooLargeError), free of HTTP
 │  │  ├─ api/             health.py, games.py, rulebooks.py, chat.py, deps.py,
-│  │  │                   error_handlers.py (maps each error kind to one status: 404, 422)
+│  │  │                   error_handlers.py (maps each error kind to one status: 404, 413, 422)
 │  │  ├─ db/              session.py, models.py
 │  │  ├─ schemas/         Pydantic request and response models
 │  │  ├─ services/        games.py (game CRUD and the expansion rules), rulebooks.py (rulebook CRUD
@@ -104,10 +104,10 @@ Games and rulebooks are separate operations: a game is created from its fields a
    1. rejects files over `max_upload_mb` (413)
    2. hashes the file; if the `sha256` matches a stored rulebook, it returns 422 with `duplicate_of: {rulebook_id, game_id, name}`
    3. opens it with PyMuPDF; an unreadable file is a 422. The page count is read here.
-   4. writes the file to `upload_dir` as `{sha256}.pdf`, then inserts the `Rulebook` (status `uploaded`) and commits; if the commit fails, it deletes the file. The file is written first because the opposite failure, a row pointing at a missing file, is worse; a leftover file is harmless, since the same PDF always gets the same name.
+   4. writes the file to `upload_dir` as `{sha256}.pdf`, then inserts the `Rulebook` (status `uploaded`; a filename over 255 characters is cut to fit, since it's only a display name) and commits; if the commit fails, it deletes the file. The file is written first because the opposite failure, a row pointing at a missing file, is worse; a leftover file is harmless, since the same PDF always gets the same name.
    5. starts the background ingestion job (below)
 
-   The file is only stored here. FastAPI's `UploadFile` spools large uploads to a temporary file, so memory stays small.
+   The file is only stored here. FastAPI's `UploadFile` spools the upload to a temporary file while it arrives; the route then reads it into memory to hash and check it, which is fine at `max_upload_mb` for a local app.
 4. **When something fails.**
    - Creating the game fails: nothing is saved, and the form keeps your fields and files.
    - A rulebook fails: the game and the other rulebooks are already saved. Each file shows its reason: duplicate ("already in your library (Catan)"), unreadable or too large offer **Remove**; a network or server error offers **Retry**. "Go to game" leaves; missing rulebooks can be added from the game's page later.
@@ -130,13 +130,13 @@ Games and rulebooks are separate operations: a game is created from its fields a
 **Games**
 - `GET /api/games` with optional filters, all of which must match: `q` (part of the name, any case), `players` (games known to support that many; unknown counts are excluded), `genres` (any of those given) and `base_game_id` (that game's expansions). `GET/PATCH/DELETE /api/games/{id}`.
 - Editing a game never touches its rulebooks: chunks don't contain the game name, so nothing is re-embedded.
-- Deleting a game deletes its rulebooks and their chunks (cascade) and removes their files.
+- Deleting a game deletes its rulebooks and their chunks (cascade), commits, then removes their files.
 - A game without rulebooks is allowed. Recommendations work from its fields; for rules questions, the agent says the game has no rulebook yet instead of searching.
 
 **Rulebooks**
 - `POST /api/games/{id}/rulebooks` adds one (Flow 1). `GET /api/games/{id}/rulebooks` lists a game's; `GET /api/rulebooks` lists all of them, with each one's game name and status.
 - `PATCH /api/rulebooks/{id} {filename?, game_id?}` renames it (display only) or moves it to another game. A move updates its chunks' `game_id` in the same transaction; nothing is re-parsed or re-embedded.
-- `DELETE /api/rulebooks/{id}` deletes the row and its chunks, then the file.
+- `DELETE /api/rulebooks/{id}` deletes the row and its chunks, commits, then removes the file. Files and rows can't share a transaction, so this order means a failure can only leave an orphan file, never a row pointing at a missing one. A file that can't be removed (for example, open in another program on Windows) is logged and left behind, and the delete still succeeds.
 - `GET /api/rulebooks/{id}/file` returns a `FileResponse`, which streams the file from disk in small pieces and answers HTTP range requests with `206 Partial Content`, so pdf.js loads only the pages it shows. CORS exposes `Accept-Ranges` and `Content-Range` so pdf.js can read them (without them it falls back to downloading the whole file), and PDF responses are never gzipped, which would break ranges.
 
 **Frontend:** each game's page has a Rulebooks section (open in the viewer, rename, delete, add); the `/rulebooks` page lists every rulebook in the library with the same actions plus moving to another game.
