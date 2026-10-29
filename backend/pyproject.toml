@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.156.2",
     "psycopg[binary]>=3.3.6",
     "pydantic-settings>=2.16.1",
+    "pymupdf>=2.0",
     "sqlalchemy[asyncio]>=2.1.5",
     "uvicorn[standard]>=0.54.0",
 ]
