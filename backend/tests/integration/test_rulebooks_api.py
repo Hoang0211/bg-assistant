@@ -86,9 +86,10 @@ async def test_post_rulebook_returns_413_for_a_file_over_the_limit(
 async def test_post_rulebook_returns_422_for_a_duplicate(api_client: AsyncClient) -> None:
     game_1 = await post_game(api_client, name="Game 1")
     game_2 = await post_game(api_client, name="Game 2")
-    original = await add_rulebook(api_client, game_1["id"], make_pdf(1))
+    data = make_pdf(1)
+    original = await add_rulebook(api_client, game_1["id"], data)
 
-    response = await upload(api_client, game_2["id"], make_pdf(1))
+    response = await upload(api_client, game_2["id"], data)
 
     assert response.status_code == 422
     assert response.json() == {
