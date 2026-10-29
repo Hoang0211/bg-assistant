@@ -76,10 +76,103 @@ export interface paths {
         patch: operations["update_game_api_games__game_id__patch"];
         trace?: never;
     };
+    "/api/games/{game_id}/rulebooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Game Rulebooks
+         * @description Return one game's rulebooks, sorted by filename.
+         */
+        get: operations["list_game_rulebooks_api_games__game_id__rulebooks_get"];
+        put?: never;
+        /**
+         * Add Rulebook
+         * @description Add a PDF as one of the game's rulebooks.
+         */
+        post: operations["add_rulebook_api_games__game_id__rulebooks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rulebooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Rulebooks
+         * @description Return all rulebooks, sorted by game name, then filename.
+         */
+        get: operations["list_rulebooks_api_rulebooks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rulebooks/{rulebook_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Rulebook File
+         * @description Return the rulebook's PDF, with support for range requests.
+         */
+        get: operations["get_rulebook_file_api_rulebooks__rulebook_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rulebooks/{rulebook_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Rulebook
+         * @description Delete a rulebook and its stored PDF.
+         */
+        delete: operations["delete_rulebook_api_rulebooks__rulebook_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Rulebook
+         * @description Rename a rulebook or move it to another game; only the fields sent change.
+         */
+        patch: operations["update_rulebook_api_rulebooks__rulebook_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Body_add_rulebook_api_games__game_id__rulebooks_post */
+        Body_add_rulebook_api_games__game_id__rulebooks_post: {
+            /** File */
+            file: string;
+        };
         /**
          * GameCreate
          * @description Body for creating a game.
@@ -220,6 +313,51 @@ export interface components {
              * @enum {string}
              */
             database: "ok" | "unreachable";
+        };
+        /**
+         * RulebookRead
+         * @description A rulebook as returned by the API, with its game's current name.
+         */
+        RulebookRead: {
+            /** Id */
+            id: number;
+            /** Game Id */
+            game_id: number;
+            /** Game Name */
+            game_name: string;
+            /** Filename */
+            filename: string;
+            /** Page Count */
+            page_count: number;
+            status: components["schemas"]["RulebookStatus"];
+            /** Error */
+            error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * RulebookStatus
+         * @description Where a rulebook is in the ingestion pipeline.
+         * @enum {string}
+         */
+        RulebookStatus: "uploaded" | "processing" | "ready" | "failed";
+        /**
+         * RulebookUpdate
+         * @description Body for renaming a rulebook or moving it to another game; send only what changes.
+         */
+        RulebookUpdate: {
+            /** Game Id */
+            game_id?: number | null;
+            /** Filename */
+            filename?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -425,6 +563,185 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GameRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_game_rulebooks_api_games__game_id__rulebooks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulebookRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_rulebook_api_games__game_id__rulebooks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_add_rulebook_api_games__game_id__rulebooks_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulebookRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_rulebooks_api_rulebooks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulebookRead"][];
+                };
+            };
+        };
+    };
+    get_rulebook_file_api_rulebooks__rulebook_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rulebook_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_rulebook_api_rulebooks__rulebook_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rulebook_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_rulebook_api_rulebooks__rulebook_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rulebook_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RulebookUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulebookRead"];
                 };
             };
             /** @description Validation Error */

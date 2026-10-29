@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     # Relative paths are resolved from the directory the app runs in (backend/).
     upload_dir: Path = Path("data/uploads")
 
+    # Largest rulebook PDF accepted, in MB.
+    max_upload_mb: int = 50
+
     # Lists frontend origins allowed to call API from browser
     cors_origins: list[str] = ["http://localhost:3000"]
 

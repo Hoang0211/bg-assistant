@@ -29,6 +29,7 @@ Genres = Annotated[
     AfterValidator(_normalize_genres),
     Field(description="Genres, stored trimmed, lowercased and without duplicates."),
 ]
+Publisher = Annotated[str, Field(max_length=200)]
 
 
 class GameCreate(BaseModel):
@@ -47,7 +48,7 @@ class GameCreate(BaseModel):
     max_play_time_minutes: Count | None = None
     year: Year | None = None
     genres: Genres = []
-    publisher: str | None = None
+    publisher: Publisher | None = None
 
     @model_validator(mode="after")
     def check_ranges(self) -> Self:
@@ -88,7 +89,7 @@ class GameUpdate(BaseModel):
     max_play_time_minutes: Count | None = None
     year: Year | None = None
     genres: Genres | None = None
-    publisher: str | None = None
+    publisher: Publisher | None = None
 
 
 class GameRead(GameCreate):

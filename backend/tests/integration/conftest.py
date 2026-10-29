@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 
 import pytest
 from alembic.config import Config
@@ -8,7 +9,7 @@ from sqlalchemy.pool import NullPool
 from testcontainers.community.postgres import PostgresContainer
 
 from alembic import command
-from app.api.deps import get_session
+from app.api.deps import get_session, get_upload_dir
 from app.main import app
 
 
@@ -48,7 +49,8 @@ async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
 
 
 @pytest.fixture
-def api_client(client: AsyncClient, db_session: AsyncSession) -> AsyncClient:
+def api_client(client: AsyncClient, db_session: AsyncSession, tmp_path: Path) -> AsyncClient:
     """The HTTP client, with every request using the test's rolled-back session."""
     app.dependency_overrides[get_session] = lambda: db_session
+    app.dependency_overrides[get_upload_dir] = lambda: tmp_path
     return client

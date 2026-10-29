@@ -1,9 +1,12 @@
+from pathlib import Path
+
 from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Game
+from app.db.models import Game, Rulebook
 from app.errors import NotFoundError, RuleViolationError
 from app.schemas.games import GameCreate, GameFilters, GameUpdate
+from app.services.rulebooks import remove_files
 
 
 class GameNotFoundError(NotFoundError):
@@ -82,7 +85,11 @@ async def update_game(session: AsyncSession, game: Game, data: GameUpdate) -> Ga
     return game
 
 
-async def delete_game(session: AsyncSession, game: Game) -> None:
+async def delete_game(session: AsyncSession, game: Game, upload_dir: Path) -> None:
     """Remove a game; its rulebooks are deleted and its expansions unlinked by the database."""
+    storage_paths = list(
+        await session.scalars(select(Rulebook.storage_path).where(Rulebook.game_id == game.id))
+    )
     await session.delete(game)
     await session.commit()
+    await remove_files(upload_dir, storage_paths)

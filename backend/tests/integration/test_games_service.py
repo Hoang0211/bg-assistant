@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +15,8 @@ from app.services.games import (
     list_games,
     update_game,
 )
+from app.services.rulebooks import add_rulebook
+from tests.helpers import make_pdf
 
 
 async def add_game(session: AsyncSession, **fields: object) -> Game:
@@ -227,10 +231,26 @@ async def test_update_game_turns_an_expansion_into_a_base_game(db_session: Async
     assert expansion.base_game_id is None
 
 
-async def test_delete_game_removes_the_game(db_session: AsyncSession) -> None:
+async def test_delete_game_removes_the_game(db_session: AsyncSession, tmp_path: Path) -> None:
     game = await add_game(db_session)
 
-    await delete_game(db_session, game)
+    await delete_game(db_session, game, tmp_path)
 
     with pytest.raises(GameNotFoundError):
         await get_game(db_session, game.id)
+
+
+async def test_delete_game_removes_the_file_of_this_game_only(
+    db_session: AsyncSession, tmp_path: Path
+) -> None:
+    game_1 = await add_game(db_session, name="Game 1")
+    game_2 = await add_game(db_session, name="Game 2")
+    kept = await add_rulebook(db_session, game_1, "rules_1.pdf", make_pdf(1), tmp_path)
+    await add_rulebook(db_session, game_2, "rules_2.pdf", make_pdf(1), tmp_path)
+    await add_rulebook(db_session, game_2, "rules_3.pdf", make_pdf(1), tmp_path)
+
+    await delete_game(db_session, game_2, tmp_path)
+
+    assert await db_session.get(Game, game_1.id) is not None
+    assert await db_session.get(Game, game_2.id) is None
+    assert list(tmp_path.iterdir()) == [tmp_path / kept.storage_path]

@@ -19,5 +19,6 @@
   "evenBetterToml.formatter.indentString": "    ",
   "evenBetterToml.formatter.arrayAutoCollapse": false,
   "python.terminal.activateEnvironment": false,
+  "python.analysis.typeCheckingMode": "standard",
   "js/ts.preferences.importModuleSpecifier": "non-relative"
 }

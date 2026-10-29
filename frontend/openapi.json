@@ -312,10 +312,271 @@
           }
         }
       }
+    },
+    "/api/games/{game_id}/rulebooks": {
+      "get": {
+        "tags": [
+          "rulebooks"
+        ],
+        "summary": "List Game Rulebooks",
+        "description": "Return one game's rulebooks, sorted by filename.",
+        "operationId": "list_game_rulebooks_api_games__game_id__rulebooks_get",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RulebookRead"
+                  },
+                  "title": "Response List Game Rulebooks Api Games  Game Id  Rulebooks Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "rulebooks"
+        ],
+        "summary": "Add Rulebook",
+        "description": "Add a PDF as one of the game's rulebooks.",
+        "operationId": "add_rulebook_api_games__game_id__rulebooks_post",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_add_rulebook_api_games__game_id__rulebooks_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulebookRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rulebooks": {
+      "get": {
+        "tags": [
+          "rulebooks"
+        ],
+        "summary": "List Rulebooks",
+        "description": "Return all rulebooks, sorted by game name, then filename.",
+        "operationId": "list_rulebooks_api_rulebooks_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RulebookRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Rulebooks Api Rulebooks Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rulebooks/{rulebook_id}/file": {
+      "get": {
+        "tags": [
+          "rulebooks"
+        ],
+        "summary": "Get Rulebook File",
+        "description": "Return the rulebook's PDF, with support for range requests.",
+        "operationId": "get_rulebook_file_api_rulebooks__rulebook_id__file_get",
+        "parameters": [
+          {
+            "name": "rulebook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Rulebook Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rulebooks/{rulebook_id}": {
+      "patch": {
+        "tags": [
+          "rulebooks"
+        ],
+        "summary": "Update Rulebook",
+        "description": "Rename a rulebook or move it to another game; only the fields sent change.",
+        "operationId": "update_rulebook_api_rulebooks__rulebook_id__patch",
+        "parameters": [
+          {
+            "name": "rulebook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Rulebook Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RulebookUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulebookRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "rulebooks"
+        ],
+        "summary": "Delete Rulebook",
+        "description": "Delete a rulebook and its stored PDF.",
+        "operationId": "delete_rulebook_api_rulebooks__rulebook_id__delete",
+        "parameters": [
+          {
+            "name": "rulebook_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Rulebook Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "Body_add_rulebook_api_games__game_id__rulebooks_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_add_rulebook_api_games__game_id__rulebooks_post"
+      },
       "GameCreate": {
         "properties": {
           "name": {
@@ -437,7 +698,8 @@
           "publisher": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 200
               },
               {
                 "type": "null"
@@ -575,7 +837,8 @@
           "publisher": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 200
               },
               {
                 "type": "null"
@@ -749,7 +1012,8 @@
           "publisher": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 200
               },
               {
                 "type": "null"
@@ -804,6 +1068,111 @@
         ],
         "title": "HealthResponse",
         "description": "Result of the API health check."
+      },
+      "RulebookRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "game_name": {
+            "type": "string",
+            "title": "Game Name"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "page_count": {
+            "type": "integer",
+            "title": "Page Count"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RulebookStatus"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "game_id",
+          "game_name",
+          "filename",
+          "page_count",
+          "status",
+          "error",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RulebookRead",
+        "description": "A rulebook as returned by the API, with its game's current name."
+      },
+      "RulebookStatus": {
+        "type": "string",
+        "enum": [
+          "uploaded",
+          "processing",
+          "ready",
+          "failed"
+        ],
+        "title": "RulebookStatus",
+        "description": "Where a rulebook is in the ingestion pipeline."
+      },
+      "RulebookUpdate": {
+        "properties": {
+          "game_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game Id"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RulebookUpdate",
+        "description": "Body for renaming a rulebook or moving it to another game; send only what changes."
       },
       "ValidationError": {
         "properties": {
