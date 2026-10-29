@@ -58,8 +58,8 @@ def test_name_is_stripped() -> None:
     assert game.name == "Catan"
 
 
-@pytest.mark.parametrize("name", ["", "   "])
-def test_empty_name_is_rejected(name: str) -> None:
+@pytest.mark.parametrize("name", ["", "   ", "x" * 201])
+def test_invalid_name_is_rejected(name: str) -> None:
     with pytest.raises(ValidationError):
         GameCreate(name=name)
 

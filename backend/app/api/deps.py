@@ -1,9 +1,11 @@
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db.session import database_is_reachable
 
 
@@ -19,3 +21,11 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+
+
+def get_upload_dir() -> Path:
+    """Dependency: the folder where rulebook PDFs are stored."""
+    return get_settings().upload_dir
+
+
+UploadDirDep = Annotated[Path, Depends(get_upload_dir)]

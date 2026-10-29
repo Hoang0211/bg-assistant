@@ -4,7 +4,7 @@ from fastapi import APIRouter, Query, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
-from app.api.deps import SessionDep
+from app.api.deps import SessionDep, UploadDirDep
 from app.schemas.games import GameCreate, GameFilters, GameRead, GameUpdate
 from app.services import games as games_service
 
@@ -46,7 +46,7 @@ async def update_game(game_id: int, data: GameUpdate, session: SessionDep) -> Ga
 
 
 @router.delete("/{game_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_game(game_id: int, session: SessionDep) -> None:
+async def delete_game(game_id: int, session: SessionDep, upload_dir: UploadDirDep) -> None:
     """Delete a game and its rulebooks; its expansions are kept and unlinked."""
     game = await games_service.get_game(session, game_id)
-    await games_service.delete_game(session, game)
+    await games_service.delete_game(session, game, upload_dir)
