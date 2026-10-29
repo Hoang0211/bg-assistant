@@ -64,6 +64,14 @@ def test_invalid_name_is_rejected(name: str) -> None:
         GameCreate(name=name)
 
 
+@pytest.mark.parametrize("schema", [GameCreate, GameUpdate])
+def test_publisher_longer_than_its_column_is_rejected(
+    schema: type[GameCreate] | type[GameUpdate],
+) -> None:
+    with pytest.raises(ValidationError):
+        schema.model_validate({"name": "Catan", "publisher": "x" * 201})
+
+
 def test_update_rejects_values_outside_the_shared_limits() -> None:
     with pytest.raises(ValidationError):
         GameUpdate.model_validate({"min_players": 0})
