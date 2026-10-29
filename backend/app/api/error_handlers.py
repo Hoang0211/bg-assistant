@@ -9,9 +9,10 @@ async def _not_found(request: Request, exc: Exception) -> JSONResponse:
 
 
 async def _rule_violation(request: Request, exc: Exception) -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, content={"detail": str(exc)}
-    )
+    extra = exc.extra if isinstance(exc, RuleViolationError) else {}
+    content = {"detail": str(exc), **extra}
+
+    return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, content=content)
 
 
 def register_error_handlers(app: FastAPI) -> None:
