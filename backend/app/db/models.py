@@ -2,19 +2,24 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     CheckConstraint,
+    Computed,
     DateTime,
     Enum,
     ForeignKey,
+    ForeignKeyConstraint,
+    Index,
     MetaData,
     String,
     Text,
+    UniqueConstraint,
     false,
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -120,3 +125,55 @@ class Rulebook(Base):
 
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+    # Lets chunks reference (id, game_id) together, so a chunk's game always matches its rulebook's.
+    __table_args__ = (UniqueConstraint("id", "game_id"),)
+
+
+class ChunkType(StrEnum):
+    """What kind of rulebook content a chunk holds."""
+
+    SECTION = "section"
+    TABLE = "table"
+    GLOSSARY = "glossary"
+    FAQ = "faq"
+
+
+class Chunk(Base):
+    """One searchable piece of a rulebook: its text, pages, embedding and full-text index."""
+
+    __tablename__ = "chunks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    rulebook_id: Mapped[int]
+    game_id: Mapped[int] = mapped_column(index=True)
+    section_path: Mapped[str] = mapped_column(Text)
+    chunk_type: Mapped[ChunkType] = mapped_column(text_enum(ChunkType))
+    page_start: Mapped[int]
+    page_end: Mapped[int]
+    content: Mapped[str] = mapped_column(Text)
+    tsv: Mapped[str] = mapped_column(
+        TSVECTOR, Computed("to_tsvector('english', content)", persisted=True)
+    )
+    embedding: Mapped[list[float]] = mapped_column(Vector(768))
+
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["rulebook_id", "game_id"],
+            ["rulebooks.id", "rulebooks.game_id"],
+            ondelete="CASCADE",
+            onupdate="CASCADE",
+        ),
+        CheckConstraint("page_start >= 1", name="page_start_positive"),
+        CheckConstraint("page_end >= page_start", name="page_range"),
+        Index(
+            "ix_chunks_embedding",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+        Index("ix_chunks_tsv", "tsv", postgresql_using="gin"),
+    )
