@@ -43,6 +43,7 @@ Run `just` to list everything. The main ones:
 - `astral-sh/setup-uv` publishes no floating major tag; pin an exact version in `.github/workflows/ci.yml`.
 - Compose needs v2.24+ (`env_file` with `required: false`).
 - Async sessions can't lazy-load: reading an expired attribute raises `MissingGreenlet`. `Base` in `backend/app/db/models.py` sets `eager_defaults=True` so database-computed values (like `updated_at`) come back with `RETURNING`; load relationships explicitly.
+- pytest runs with `HF_HUB_OFFLINE=1`, so the Docling models must already be downloaded: run `uv run docling-tools models download` once from `backend/`. Otherwise the parser tests fail with a "model not found" error.
 
 ## Progress
 

@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # Largest rulebook PDF accepted, in MB.
     max_upload_mb: int = 50
 
+    # Pages with fewer characters in their text layer are parsed with OCR.
+    ocr_min_page_chars: int = 100
+
     # Lists frontend origins allowed to call API from browser
     cors_origins: list[str] = ["http://localhost:3000"]
 
