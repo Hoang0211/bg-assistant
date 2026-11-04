@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     # Sections with fewer tokens are merged into a neighbouring section.
     chunk_min_tokens: int = 80
 
+    # A section over the max is split into chunks of about the target size.
+    chunk_target_tokens: int = 350
+    chunk_max_tokens: int = 450
+
+    # A chunk's last element is repeated in the next chunk if it's at most this long.
+    chunk_overlap_tokens: int = 50
+
     # Lists frontend origins allowed to call API from browser
     cors_origins: list[str] = ["http://localhost:3000"]
 
