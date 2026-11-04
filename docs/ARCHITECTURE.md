@@ -117,6 +117,7 @@ Games and rulebooks are separate operations: a game is created from its fields a
      - **OCR only where needed:** PyMuPDF first counts each page's characters. Docling parses the whole PDF without OCR, then re-parses each page under `ocr_min_page_chars` (a setting in `config.py`) with OCR and uses those elements instead. On a PDF with a text layer, OCR mostly reads decorative title art into fake headings and doubles the parse time (Catan: 154 s with OCR, 80 s without). Text that exists only inside images on pages that do have text (card counts, icons) is lost; the parse report flags those pages as image-heavy.
    - **Chunk (rulebook-aware):**
      - Split at every heading. Merge sections under ~80 tokens into the previous one (into the next one only when there's no previous one), so fake headings ("Illustration A", an "Example" box title) join the rule they belong to; split long ones at paragraph or list breaks, targeting ~350 tokens with a hard limit of ~450 and a small overlap. A paragraph still over the limit is split at sentence ends, and a sentence still over it by token count, because the embedder silently cuts off anything past 512 tokens.
+     - A paragraph cut by a page break comes out as two items. When a text item doesn't end with `.`, `!`, `?` or `:` and the next item is text at the top of the next page, the two are joined into one paragraph, so a split never lands mid-sentence.
      - Sidebars and "Example" boxes have no label of their own: Docling places their text in reading order, so it joins the section it's printed in.
      - Tables stay whole as Markdown, or split by rows with the header repeated.
      - Glossary, FAQ and quick-reference pages: one chunk per term or question.
@@ -206,7 +207,7 @@ The `rules_agent` node calls `chat_model` with four tools. Conditional edges sen
 ## Evaluation
 
 - `backend/eval/` holds a golden dataset of about 30–50 questions with expected pages, from 2–3 freely available rulebooks.
-- **Retrieval (no LLM, free):** Recall@k, MRR and nDCG, comparing vector-only, full-text-only, hybrid, and hybrid + reranker.
+- **Retrieval (no LLM, free):** Recall@k, MRR and nDCG, comparing vector-only, full-text-only, hybrid, and hybrid + reranker. A retrieved chunk is a hit when an expected page falls inside its `page_start`–`page_end` range; an answer spread over two pages lists both, and covering either counts.
 - **Answers (LLM-as-judge):** faithfulness, correctness and citation accuracy, plus clarification behaviour (asks when it should, stays quiet when it shouldn't) and a few out-of-scope questions (declines, then offers web search only for those).
 - **Routing:** about 40 labelled messages, including tricky ones; accuracy and a confusion matrix.
 - Results go into a Markdown report, and the README shows the results table.
