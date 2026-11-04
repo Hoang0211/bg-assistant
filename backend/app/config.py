@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # Pages with fewer characters in their text layer are parsed with OCR.
     ocr_min_page_chars: int = 100
 
+    # Sections with fewer tokens are merged into a neighbouring section.
+    chunk_min_tokens: int = 80
+
     # Lists frontend origins allowed to call API from browser
     cors_origins: list[str] = ["http://localhost:3000"]
 
