@@ -33,6 +33,7 @@ class Element:
     kind: ElementKind
     text: str
     page: int
+    last_page: int | None = None  # set when the text carries on over a page break
 
 
 # Labels not listed here (pictures, charts, formulas, code, the table of contents) are skipped.

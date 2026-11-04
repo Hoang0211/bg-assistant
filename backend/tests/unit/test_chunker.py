@@ -1,3 +1,5 @@
+import pytest
+
 from app.db.models import ChunkType
 from app.ingestion.chunker import ChunkLimits, TextChunk, chunk_elements
 from app.ingestion.layout_parser import Element, ElementKind
@@ -229,9 +231,9 @@ def test_chunk_elements_keeps_a_section_at_the_max_whole() -> None:
 def test_chunk_elements_splits_a_long_section_between_elements() -> None:
     elements = [
         Element(ElementKind.HEADING, "Trading", 1),
-        Element(ElementKind.PARAGRAPH, "a b c d e f", 1),
-        Element(ElementKind.PARAGRAPH, "g h i j k l", 2),
-        Element(ElementKind.PARAGRAPH, "m n o p q r", 3),
+        Element(ElementKind.PARAGRAPH, "a b c d e f.", 1),
+        Element(ElementKind.PARAGRAPH, "g h i j k l.", 2),
+        Element(ElementKind.PARAGRAPH, "m n o p q r.", 3),
     ]
 
     assert chunk_elements(elements, count_words, limits(target_tokens=10, max_tokens=12)) == [
@@ -240,21 +242,21 @@ def test_chunk_elements_splits_a_long_section_between_elements() -> None:
             chunk_type=ChunkType.SECTION,
             page_start=1,
             page_end=1,
-            content="Trading\n\na b c d e f",
+            content="Trading\n\na b c d e f.",
         ),
         TextChunk(
             section_path="Trading",
             chunk_type=ChunkType.SECTION,
             page_start=2,
             page_end=2,
-            content="Trading\n\ng h i j k l",
+            content="Trading\n\ng h i j k l.",
         ),
         TextChunk(
             section_path="Trading",
             chunk_type=ChunkType.SECTION,
             page_start=3,
             page_end=3,
-            content="Trading\n\nm n o p q r",
+            content="Trading\n\nm n o p q r.",
         ),
     ]
 
@@ -262,9 +264,9 @@ def test_chunk_elements_splits_a_long_section_between_elements() -> None:
 def test_chunk_elements_repeats_a_short_last_element_in_the_next_chunk() -> None:
     elements = [
         Element(ElementKind.HEADING, "Trading", 1),
-        Element(ElementKind.PARAGRAPH, "a b c d e f", 1),
-        Element(ElementKind.PARAGRAPH, "g h", 2),
-        Element(ElementKind.PARAGRAPH, "i j k l m n o", 3),
+        Element(ElementKind.PARAGRAPH, "a b c d e f.", 1),
+        Element(ElementKind.PARAGRAPH, "g h.", 2),
+        Element(ElementKind.PARAGRAPH, "i j k l m n o.", 3),
     ]
 
     assert chunk_elements(
@@ -275,14 +277,14 @@ def test_chunk_elements_repeats_a_short_last_element_in_the_next_chunk() -> None
             chunk_type=ChunkType.SECTION,
             page_start=1,
             page_end=2,
-            content="Trading\n\na b c d e f\n\ng h",
+            content="Trading\n\na b c d e f.\n\ng h.",
         ),
         TextChunk(
             section_path="Trading",
             chunk_type=ChunkType.SECTION,
             page_start=2,
             page_end=3,
-            content="Trading\n\ng h\n\ni j k l m n o",
+            content="Trading\n\ng h.\n\ni j k l m n o.",
         ),
     ]
 
@@ -290,9 +292,9 @@ def test_chunk_elements_repeats_a_short_last_element_in_the_next_chunk() -> None
 def test_chunk_elements_does_not_repeat_a_last_element_over_the_overlap() -> None:
     elements = [
         Element(ElementKind.HEADING, "Trading", 1),
-        Element(ElementKind.PARAGRAPH, "a b c d e f", 1),
-        Element(ElementKind.PARAGRAPH, "g h", 2),
-        Element(ElementKind.PARAGRAPH, "i j k l m n o", 3),
+        Element(ElementKind.PARAGRAPH, "a b c d e f.", 1),
+        Element(ElementKind.PARAGRAPH, "g h.", 2),
+        Element(ElementKind.PARAGRAPH, "i j k l m n o.", 3),
     ]
 
     assert chunk_elements(
@@ -303,14 +305,14 @@ def test_chunk_elements_does_not_repeat_a_last_element_over_the_overlap() -> Non
             chunk_type=ChunkType.SECTION,
             page_start=1,
             page_end=2,
-            content="Trading\n\na b c d e f\n\ng h",
+            content="Trading\n\na b c d e f.\n\ng h.",
         ),
         TextChunk(
             section_path="Trading",
             chunk_type=ChunkType.SECTION,
             page_start=3,
             page_end=3,
-            content="Trading\n\ni j k l m n o",
+            content="Trading\n\ni j k l m n o.",
         ),
     ]
 
@@ -386,8 +388,8 @@ def test_chunk_elements_splits_a_long_sentence_between_words() -> None:
 
 def test_chunk_elements_splits_a_long_section_with_no_heading() -> None:
     elements = [
-        Element(ElementKind.PARAGRAPH, "a b c d e f g", 1),
-        Element(ElementKind.PARAGRAPH, "h i j k l m n", 2),
+        Element(ElementKind.PARAGRAPH, "a b c d e f g.", 1),
+        Element(ElementKind.PARAGRAPH, "h i j k l m n.", 2),
     ]
 
     assert chunk_elements(elements, count_words, limits(target_tokens=10, max_tokens=12)) == [
@@ -396,13 +398,199 @@ def test_chunk_elements_splits_a_long_section_with_no_heading() -> None:
             chunk_type=ChunkType.SECTION,
             page_start=1,
             page_end=1,
-            content="a b c d e f g",
+            content="a b c d e f g.",
         ),
         TextChunk(
             section_path="",
             chunk_type=ChunkType.SECTION,
             page_start=2,
             page_end=2,
-            content="h i j k l m n",
+            content="h i j k l m n.",
+        ),
+    ]
+
+
+def test_chunk_elements_joins_a_paragraph_cut_by_a_page_break() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Robber", 4),
+        Element(ElementKind.PARAGRAPH, "When a 7 is rolled, players with more than", 4),
+        Element(ElementKind.PARAGRAPH, "7 cards discard half.", 5),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Robber",
+            chunk_type=ChunkType.SECTION,
+            page_start=4,
+            page_end=5,
+            content="Robber\n\nWhen a 7 is rolled, players with more than 7 cards discard half.",
+        ),
+    ]
+
+
+@pytest.mark.parametrize("ending", [".", "!", "?", ":"])
+def test_chunk_elements_does_not_join_text_that_ends_a_sentence(ending: str) -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Robber", 4),
+        Element(ElementKind.PARAGRAPH, f"Move the robber{ending}", 4),
+        Element(ElementKind.PARAGRAPH, "Steal one card.", 5),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Robber",
+            chunk_type=ChunkType.SECTION,
+            page_start=4,
+            page_end=5,
+            content=f"Robber\n\nMove the robber{ending}\n\nSteal one card.",
+        ),
+    ]
+
+
+def test_chunk_elements_does_not_join_text_on_the_same_page() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Robber", 4),
+        Element(ElementKind.PARAGRAPH, "Move the robber", 4),
+        Element(ElementKind.PARAGRAPH, "Steal one card.", 4),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Robber",
+            chunk_type=ChunkType.SECTION,
+            page_start=4,
+            page_end=4,
+            content="Robber\n\nMove the robber\n\nSteal one card.",
+        ),
+    ]
+
+
+def test_chunk_elements_does_not_join_text_across_a_skipped_page() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Robber", 4),
+        Element(ElementKind.PARAGRAPH, "Move the robber", 4),
+        Element(ElementKind.PARAGRAPH, "Steal one card.", 6),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Robber",
+            chunk_type=ChunkType.SECTION,
+            page_start=4,
+            page_end=6,
+            content="Robber\n\nMove the robber\n\nSteal one card.",
+        ),
+    ]
+
+
+@pytest.mark.parametrize("kind", [ElementKind.HEADING, ElementKind.TABLE, ElementKind.CAPTION])
+def test_chunk_elements_does_not_join_text_after_a_non_text_element(kind: ElementKind) -> None:
+    elements = [
+        Element(kind, "Illustration", 4),
+        Element(ElementKind.PARAGRAPH, "Steal one card.", 5),
+    ]
+    chunks = chunk_elements(elements, count_words, limits())
+
+    assert [chunk.content for chunk in chunks] == ["Illustration\n\nSteal one card."]
+
+
+@pytest.mark.parametrize("kind", [ElementKind.TABLE, ElementKind.CAPTION, ElementKind.LIST_ITEM])
+def test_chunk_elements_does_not_join_a_non_paragraph_on_the_next_page(kind: ElementKind) -> None:
+    elements = [
+        Element(ElementKind.PARAGRAPH, "Move the robber", 4),
+        Element(kind, "Steal one card.", 5),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.SECTION,
+            page_start=4,
+            page_end=5,
+            content="Move the robber\n\nSteal one card.",
+        ),
+    ]
+
+
+def test_chunk_elements_does_not_join_a_heading_on_the_next_page() -> None:
+    elements = [
+        Element(ElementKind.PARAGRAPH, "Move the robber", 4),
+        Element(ElementKind.HEADING, "Trading", 5),
+        Element(ElementKind.PARAGRAPH, "Trade with the bank.", 5),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.SECTION,
+            page_start=4,
+            page_end=4,
+            content="Move the robber",
+        ),
+        TextChunk(
+            section_path="Trading",
+            chunk_type=ChunkType.SECTION,
+            page_start=5,
+            page_end=5,
+            content="Trading\n\nTrade with the bank.",
+        ),
+    ]
+
+
+def test_chunk_elements_joins_a_list_item_cut_by_a_page_break() -> None:
+    elements = [
+        Element(ElementKind.LIST_ITEM, "Discard half your cards if you hold more than", 4),
+        Element(ElementKind.PARAGRAPH, "7 cards.", 5),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.SECTION,
+            page_start=4,
+            page_end=5,
+            content="Discard half your cards if you hold more than 7 cards.",
+        )
+    ]
+
+
+def test_chunk_elements_joins_a_paragraph_over_three_pages() -> None:
+    elements = [
+        Element(ElementKind.PARAGRAPH, "Discard half your cards", 4),
+        Element(ElementKind.PARAGRAPH, "if you hold more than", 5),
+        Element(ElementKind.PARAGRAPH, "7 cards.", 6),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.SECTION,
+            page_start=4,
+            page_end=6,
+            content="Discard half your cards if you hold more than 7 cards.",
+        )
+    ]
+
+
+def test_chunk_elements_keeps_the_page_range_when_splitting_a_joined_paragraph() -> None:
+    elements = [
+        Element(ElementKind.PARAGRAPH, "Discard half your cards", 4),
+        Element(ElementKind.PARAGRAPH, "if you hold more than 7 cards. Then move the robber.", 5),
+    ]
+
+    assert chunk_elements(elements, count_words, limits(target_tokens=11, max_tokens=11)) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.SECTION,
+            page_start=4,
+            page_end=5,
+            content="Discard half your cards if you hold more than 7 cards.",
+        ),
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.SECTION,
+            page_start=4,
+            page_end=5,
+            content="Then move the robber.",
         ),
     ]

@@ -35,6 +35,32 @@ def _content(section: list[Element]) -> str:
     return "\n\n".join(element.text for element in section)
 
 
+def _last_page(element: Element) -> int:
+    return element.last_page or element.page
+
+
+def _continues(previous: Element, element: Element) -> bool:
+    return (
+        previous.kind in (ElementKind.PARAGRAPH, ElementKind.LIST_ITEM)
+        and element.kind == ElementKind.PARAGRAPH
+        and element.page == _last_page(previous) + 1
+        and not previous.text.endswith((".", "!", "?", ":"))
+    )
+
+
+def _join_page_breaks(elements: list[Element]) -> list[Element]:
+    joined: list[Element] = []
+    for element in elements:
+        if joined and _continues(joined[-1], element):
+            previous = joined[-1]
+            joined[-1] = replace(
+                previous, text=f"{previous.text} {element.text}", last_page=element.page
+            )
+        else:
+            joined.append(element)
+    return joined
+
+
 def _split_at_words(text: str, count_tokens: Callable[[str], int], limit: int) -> list[str]:
     pieces: list[str] = []
     current: list[str] = []
@@ -127,7 +153,8 @@ def chunk_elements(
     elements: list[Element], count_tokens: Callable[[str], int], limits: ChunkLimits
 ) -> list[TextChunk]:
     """Split parsed elements at headings, then merge small sections and split long ones."""
-    merged = _merge_small_sections(_split_at_headings(elements), count_tokens, limits.min_tokens)
+    joined = _join_page_breaks(elements)
+    merged = _merge_small_sections(_split_at_headings(joined), count_tokens, limits.min_tokens)
     sections = [
         part
         for heading, section in merged
@@ -140,7 +167,7 @@ def chunk_elements(
                 section_path=heading,
                 chunk_type=ChunkType.SECTION,
                 page_start=min(element.page for element in section),
-                page_end=max(element.page for element in section),
+                page_end=max(_last_page(element) for element in section),
                 content=_content(section),
             )
         )
