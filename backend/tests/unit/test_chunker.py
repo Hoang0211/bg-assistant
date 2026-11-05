@@ -15,6 +15,11 @@ def limits(
     return ChunkLimits(min_tokens, target_tokens, max_tokens, overlap_tokens)
 
 
+TABLE = "| Building | Cost |\n|---|---|\n| Road | Brick |"
+
+HEADER = "| Building | Cost |\n|---|---|"
+
+
 def test_chunk_elements_starts_a_new_chunk_at_each_heading() -> None:
     elements = [
         Element(ElementKind.HEADING, "Setup", 1),
@@ -483,7 +488,7 @@ def test_chunk_elements_does_not_join_text_across_a_skipped_page() -> None:
     ]
 
 
-@pytest.mark.parametrize("kind", [ElementKind.HEADING, ElementKind.TABLE, ElementKind.CAPTION])
+@pytest.mark.parametrize("kind", [ElementKind.HEADING, ElementKind.CAPTION])
 def test_chunk_elements_does_not_join_text_after_a_non_text_element(kind: ElementKind) -> None:
     elements = [
         Element(kind, "Illustration", 4),
@@ -494,7 +499,7 @@ def test_chunk_elements_does_not_join_text_after_a_non_text_element(kind: Elemen
     assert [chunk.content for chunk in chunks] == ["Illustration\n\nSteal one card."]
 
 
-@pytest.mark.parametrize("kind", [ElementKind.TABLE, ElementKind.CAPTION, ElementKind.LIST_ITEM])
+@pytest.mark.parametrize("kind", [ElementKind.CAPTION, ElementKind.LIST_ITEM])
 def test_chunk_elements_does_not_join_a_non_paragraph_on_the_next_page(kind: ElementKind) -> None:
     elements = [
         Element(ElementKind.PARAGRAPH, "Move the robber", 4),
@@ -609,5 +614,208 @@ def test_chunk_elements_does_not_join_text_that_starts_with_a_capital() -> None:
             page_start=1,
             page_end=2,
             content="Grimm Edition\n\nSnow White and many other tales.",
+        ),
+    ]
+
+
+def test_chunk_elements_puts_a_table_in_its_own_chunk() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Costs", 3),
+        Element(ElementKind.PARAGRAPH, "Pay first.", 3),
+        Element(ElementKind.TABLE, TABLE, 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.SECTION,
+            page_start=3,
+            page_end=3,
+            content="Costs\n\nPay first.",
+        ),
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\n{TABLE}",
+        ),
+    ]
+
+
+def test_chunk_elements_keeps_only_the_table_chunk_for_a_heading_with_no_text() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Costs", 3),
+        Element(ElementKind.TABLE, TABLE, 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\n{TABLE}",
+        ),
+    ]
+
+
+def test_chunk_elements_keeps_a_table_with_no_heading() -> None:
+    elements = [
+        Element(ElementKind.TABLE, TABLE, 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=TABLE,
+        ),
+    ]
+
+
+def test_chunk_elements_keeps_the_text_around_a_table_in_one_chunk() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Costs", 3),
+        Element(ElementKind.PARAGRAPH, "Pay first.", 3),
+        Element(ElementKind.TABLE, TABLE, 3),
+        Element(ElementKind.PARAGRAPH, "Then build.", 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.SECTION,
+            page_start=3,
+            page_end=3,
+            content="Costs\n\nPay first.\n\nThen build.",
+        ),
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\n{TABLE}",
+        ),
+    ]
+
+
+def test_chunk_elements_does_not_merge_a_small_table() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Setup", 2),
+        Element(ElementKind.PARAGRAPH, "Place the board.", 2),
+        Element(ElementKind.HEADING, "Costs", 3),
+        Element(ElementKind.TABLE, TABLE, 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits(min_tokens=20)) == [
+        TextChunk(
+            section_path="Setup",
+            chunk_type=ChunkType.SECTION,
+            page_start=2,
+            page_end=2,
+            content="Setup\n\nPlace the board.",
+        ),
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\n{TABLE}",
+        ),
+    ]
+
+
+def test_chunk_elements_does_not_join_text_on_either_side_of_a_table() -> None:
+    elements = [
+        Element(ElementKind.PARAGRAPH, "Pay with", 4),
+        Element(ElementKind.TABLE, TABLE, 4),
+        Element(ElementKind.PARAGRAPH, "two bricks.", 5),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.SECTION,
+            page_start=4,
+            page_end=5,
+            content="Pay with\n\ntwo bricks.",
+        ),
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.TABLE,
+            page_start=4,
+            page_end=4,
+            content=TABLE,
+        ),
+    ]
+
+
+def test_chunk_elements_keeps_a_table_at_the_max_whole() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Costs", 3),
+        Element(ElementKind.TABLE, TABLE, 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits(target_tokens=12, max_tokens=12)) == [
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\n{TABLE}",
+        ),
+    ]
+
+
+def test_chunk_elements_splits_a_long_table_between_rows() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Costs", 3),
+        Element(
+            ElementKind.TABLE,
+            f"{HEADER}\n| Road | Brick |\n| City | Ore |\n| Farm | Wool |\n| Port | Clay |",
+            3,
+        ),
+    ]
+
+    assert chunk_elements(elements, count_words, limits(target_tokens=17, max_tokens=17)) == [
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\n{HEADER}\n| Road | Brick |\n| City | Ore |",
+        ),
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\n{HEADER}\n| Farm | Wool |\n| Port | Clay |",
+        ),
+    ]
+
+
+def test_chunk_elements_splits_a_long_table_row_between_words() -> None:
+    elements = [
+        Element(ElementKind.TABLE, f"{HEADER}\n| one two three four five six |", 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits(target_tokens=10, max_tokens=10)) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"{HEADER}\n| one two three",
+        ),
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"{HEADER}\nfour five six |",
         ),
     ]

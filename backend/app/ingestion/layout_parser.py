@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cache
@@ -57,6 +58,10 @@ def _converter(ocr: bool) -> DocumentConverter:
     )
 
 
+def _compact_table(markdown: str) -> str:
+    return re.sub(r"-{3,}", "---", re.sub(r" {2,}", " ", markdown))
+
+
 def _to_elements(document: DoclingDocument) -> list[Element]:
     elements: list[Element] = []
     for item, _level in document.iterate_items():
@@ -68,7 +73,7 @@ def _to_elements(document: DoclingDocument) -> list[Element]:
             continue
 
         if isinstance(item, TableItem):
-            text = item.export_to_markdown(doc=document)
+            text = _compact_table(item.export_to_markdown(doc=document))
         elif isinstance(item, TextItem):
             text = item.text.strip()
         else:

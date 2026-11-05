@@ -96,9 +96,13 @@ def test_parse_pdf_returns_a_table_as_markdown(tmp_path: Path) -> None:
 
     tables = [element for element in elements if element.kind == ElementKind.TABLE]
     assert len(tables) == 1
-    lines = tables[0].text.splitlines()
-    cells = [[cell.strip() for cell in line.strip("|").split("|")] for line in lines]
-    assert [cells[0], *cells[2:]] == rows
+    assert tables[0].text == (
+        "| Building | Cost | Points |\n"
+        "|---|---|---|\n"
+        "| Road | Brick, Lumber | 0 |\n"
+        "| Settlement | Brick, Lumber, Wool, Grain | 1 |\n"
+        "| City | Ore x3, Grain x2 | 2 |"
+    )
 
 
 def test_parse_pdf_reads_an_image_only_page_with_ocr(tmp_path: Path) -> None:

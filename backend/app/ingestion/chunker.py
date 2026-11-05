@@ -118,6 +118,44 @@ def _split_long_section(
     return parts
 
 
+def _pull_out_tables(elements: list[Element]) -> tuple[list[Element], list[tuple[str, Element]]]:
+    text: list[Element] = []
+    tables: list[tuple[str, Element]] = []
+    heading = ""
+    for element in elements:
+        if element.kind == ElementKind.HEADING:
+            heading = element.text
+        if element.kind == ElementKind.TABLE:
+            tables.append((heading, element))
+        else:
+            text.append(element)
+    return text, tables
+
+
+def _split_long_table(
+    heading: str, table: str, count_tokens: Callable[[str], int], limits: ChunkLimits
+) -> list[str]:
+    whole = f"{heading}\n\n{table}" if heading else table
+    if count_tokens(whole) <= limits.max_tokens:
+        return [whole]
+
+    lines = table.split("\n")
+    header = "\n".join(lines[:2])
+    top = f"{heading}\n\n{header}" if heading else header
+    limit = limits.target_tokens - count_tokens(top)
+    rows = [piece for row in lines[2:] for piece in _split_at_words(row, count_tokens, limit)]
+
+    pieces: list[str] = []
+    current: list[str] = []
+    for row in rows:
+        if current and count_tokens("\n".join([top, *current, row])) > limits.target_tokens:
+            pieces.append("\n".join([top, *current]))
+            current = []
+        current.append(row)
+    pieces.append("\n".join([top, *current]))
+    return pieces
+
+
 def _split_at_headings(elements: list[Element]) -> list[_Section]:
     sections: list[_Section] = [("", [])]
     for element in elements:
@@ -154,8 +192,8 @@ def chunk_elements(
     elements: list[Element], count_tokens: Callable[[str], int], limits: ChunkLimits
 ) -> list[TextChunk]:
     """Split parsed elements at headings, then merge small sections and split long ones."""
-    joined = _join_page_breaks(elements)
-    merged = _merge_small_sections(_split_at_headings(joined), count_tokens, limits.min_tokens)
+    text, tables = _pull_out_tables(_join_page_breaks(elements))
+    merged = _merge_small_sections(_split_at_headings(text), count_tokens, limits.min_tokens)
     sections = [
         part
         for heading, section in merged
@@ -172,5 +210,17 @@ def chunk_elements(
                 content=_content(section),
             )
         )
+
+    for heading, table in tables:
+        for content in _split_long_table(heading, table.text, count_tokens, limits):
+            chunks.append(
+                TextChunk(
+                    section_path=heading,
+                    chunk_type=ChunkType.TABLE,
+                    page_start=table.page,
+                    page_end=table.page,
+                    content=content,
+                )
+            )
 
     return chunks
