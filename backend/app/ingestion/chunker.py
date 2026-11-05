@@ -45,6 +45,7 @@ def _continues(previous: Element, element: Element) -> bool:
         and element.kind == ElementKind.PARAGRAPH
         and element.page == _last_page(previous) + 1
         and not previous.text.endswith((".", "!", "?", ":"))
+        and not element.text[0].isupper()
     )
 
 

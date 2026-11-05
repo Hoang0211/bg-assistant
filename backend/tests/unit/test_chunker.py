@@ -594,3 +594,20 @@ def test_chunk_elements_keeps_the_page_range_when_splitting_a_joined_paragraph()
             content="Then move the robber.",
         ),
     ]
+
+
+def test_chunk_elements_does_not_join_text_that_starts_with_a_capital() -> None:
+    elements = [
+        Element(ElementKind.PARAGRAPH, "Grimm Edition", 1),
+        Element(ElementKind.PARAGRAPH, "Snow White and many other tales.", 2),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.SECTION,
+            page_start=1,
+            page_end=2,
+            content="Grimm Edition\n\nSnow White and many other tales.",
+        ),
+    ]
