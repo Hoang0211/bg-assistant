@@ -37,7 +37,6 @@ def upgrade() -> None:
                 "section",
                 "table",
                 "glossary",
-                "faq",
                 name="chunktype",
                 native_enum=False,
                 create_constraint=True,

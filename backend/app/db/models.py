@@ -136,7 +136,6 @@ class ChunkType(StrEnum):
     SECTION = "section"
     TABLE = "table"
     GLOSSARY = "glossary"
-    FAQ = "faq"
 
 
 class Chunk(Base):
