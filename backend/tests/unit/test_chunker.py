@@ -819,3 +819,443 @@ def test_chunk_elements_splits_a_long_table_row_between_words() -> None:
             content=f"{HEADER}\nfour five six |",
         ),
     ]
+
+
+def test_chunk_elements_puts_each_glossary_entry_in_its_own_chunk() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Cards", 18),
+        Element(ElementKind.PARAGRAPH, "Bard: Gain a point.", 18),
+        Element(ElementKind.PARAGRAPH, "Queen: Play a card.", 18),
+        Element(ElementKind.PARAGRAPH, "Ranger: Move a worker.", 18),
+        Element(ElementKind.PARAGRAPH, "Wife: Share a space.", 18),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nBard: Gain a point.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nQueen: Play a card.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nRanger: Move a worker.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nWife: Share a space.",
+        ),
+    ]
+
+
+def test_chunk_elements_keeps_a_short_run_of_entries_in_its_section() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Cards", 18),
+        Element(ElementKind.PARAGRAPH, "Bard: Gain a point.", 18),
+        Element(ElementKind.PARAGRAPH, "Queen: Play a card.", 18),
+        Element(ElementKind.PARAGRAPH, "Ranger: Move a worker.", 18),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.SECTION,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nBard: Gain a point.\n\nQueen: Play a card.\n\nRanger: Move a worker.",
+        )
+    ]
+
+
+def test_chunk_elements_keeps_glossary_entries_with_no_heading() -> None:
+    elements = [
+        Element(ElementKind.PARAGRAPH, "Bard: Gain a point.", 18),
+        Element(ElementKind.PARAGRAPH, "Queen: Play a card.", 18),
+        Element(ElementKind.PARAGRAPH, "Ranger: Move a worker.", 18),
+        Element(ElementKind.PARAGRAPH, "Wife: Share a space.", 18),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Bard: Gain a point.",
+        ),
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Queen: Play a card.",
+        ),
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Ranger: Move a worker.",
+        ),
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Wife: Share a space.",
+        ),
+    ]
+
+
+def test_chunk_elements_does_not_count_entries_split_by_other_text() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Cards", 18),
+        Element(ElementKind.PARAGRAPH, "Bard: Gain a point.", 18),
+        Element(ElementKind.PARAGRAPH, "Queen: Play a card.", 18),
+        Element(ElementKind.PARAGRAPH, "Shuffle the deck.", 18),
+        Element(ElementKind.PARAGRAPH, "Ranger: Move a worker.", 18),
+        Element(ElementKind.PARAGRAPH, "Wife: Share a space.", 18),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.SECTION,
+            page_start=18,
+            page_end=18,
+            content=(
+                "Cards\n\nBard: Gain a point.\n\nQueen: Play a card.\n\nShuffle the deck."
+                "\n\nRanger: Move a worker.\n\nWife: Share a space."
+            ),
+        )
+    ]
+
+
+def test_chunk_elements_treats_list_items_as_glossary_entries() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Cards", 18),
+        Element(ElementKind.LIST_ITEM, "Bard: Gain a point.", 18),
+        Element(ElementKind.LIST_ITEM, "Queen: Play a card.", 18),
+        Element(ElementKind.LIST_ITEM, "Ranger: Move a worker.", 18),
+        Element(ElementKind.LIST_ITEM, "Wife: Share a space.", 18),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nBard: Gain a point.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nQueen: Play a card.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nRanger: Move a worker.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nWife: Share a space.",
+        ),
+    ]
+
+
+def test_chunk_elements_does_not_merge_small_glossary_entries() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Cards", 18),
+        Element(ElementKind.PARAGRAPH, "Bard: Gain a point.", 18),
+        Element(ElementKind.PARAGRAPH, "Queen: Play a card.", 18),
+        Element(ElementKind.PARAGRAPH, "Ranger: Move a worker.", 18),
+        Element(ElementKind.PARAGRAPH, "Wife: Share a space.", 18),
+    ]
+
+    assert chunk_elements(elements, count_words, limits(min_tokens=50)) == [
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nBard: Gain a point.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nQueen: Play a card.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nRanger: Move a worker.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nWife: Share a space.",
+        ),
+    ]
+
+
+def test_chunk_elements_splits_a_long_glossary_entry() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Cards", 18),
+        Element(ElementKind.PARAGRAPH, "Bard: Gain a point. Draw a card.", 18),
+        Element(ElementKind.PARAGRAPH, "Queen: Play a card.", 18),
+        Element(ElementKind.PARAGRAPH, "Ranger: Move a worker.", 18),
+        Element(ElementKind.PARAGRAPH, "Wife: Share a space.", 18),
+    ]
+
+    assert chunk_elements(elements, count_words, limits(target_tokens=7, max_tokens=7)) == [
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nBard: Gain a point.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nDraw a card.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nQueen: Play a card.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nRanger: Move a worker.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nWife: Share a space.",
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Move first. Then: pay.",
+        "the bard: Gain a point.",
+        "A very long opening to a sentence that keeps going on: pay.",
+        "Bard:",
+    ],
+)
+def test_chunk_elements_does_not_treat_other_text_as_a_glossary_entry(text: str) -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Cards", 18),
+        Element(
+            ElementKind.PARAGRAPH,
+            text,
+            18,
+        ),
+        Element(ElementKind.PARAGRAPH, "Queen: Play a card.", 18),
+        Element(ElementKind.PARAGRAPH, "Ranger: Move a worker.", 18),
+        Element(ElementKind.PARAGRAPH, "Wife: Share a space.", 18),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.SECTION,
+            page_start=18,
+            page_end=18,
+            content=(
+                f"Cards\n\n{text}\n\nQueen: Play a card."
+                "\n\nRanger: Move a worker.\n\nWife: Share a space."
+            ),
+        )
+    ]
+
+
+def test_chunk_elements_keeps_the_pages_of_each_glossary_entry() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Cards", 18),
+        Element(ElementKind.PARAGRAPH, "Bard: Gain a point and", 18),
+        Element(ElementKind.PARAGRAPH, "draw a card.", 19),
+        Element(ElementKind.PARAGRAPH, "Queen: Play a card.", 19),
+        Element(ElementKind.PARAGRAPH, "Ranger: Move a worker.", 19),
+        Element(ElementKind.PARAGRAPH, "Wife: Share a space.", 19),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=19,
+            content="Cards\n\nBard: Gain a point and draw a card.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=19,
+            page_end=19,
+            content="Cards\n\nQueen: Play a card.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=19,
+            page_end=19,
+            content="Cards\n\nRanger: Move a worker.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=19,
+            page_end=19,
+            content="Cards\n\nWife: Share a space.",
+        ),
+    ]
+
+
+def test_chunk_elements_keeps_text_before_a_glossary_in_its_section() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Cards", 18),
+        Element(ElementKind.PARAGRAPH, "These cards score at game end.", 18),
+        Element(ElementKind.PARAGRAPH, "Bard: Gain a point.", 18),
+        Element(ElementKind.PARAGRAPH, "Queen: Play a card.", 18),
+        Element(ElementKind.PARAGRAPH, "Ranger: Move a worker.", 18),
+        Element(ElementKind.PARAGRAPH, "Wife: Share a space.", 18),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.SECTION,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nThese cards score at game end.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nBard: Gain a point.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nQueen: Play a card.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nRanger: Move a worker.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nWife: Share a space.",
+        ),
+    ]
+
+
+def test_chunk_elements_uses_the_nearest_heading_for_glossary_entries() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Setup", 17),
+        Element(ElementKind.PARAGRAPH, "Place the board.", 17),
+        Element(ElementKind.HEADING, "Cards", 18),
+        Element(ElementKind.PARAGRAPH, "Bard: Gain a point.", 18),
+        Element(ElementKind.PARAGRAPH, "Queen: Play a card.", 18),
+        Element(ElementKind.PARAGRAPH, "Ranger: Move a worker.", 18),
+        Element(ElementKind.PARAGRAPH, "Wife: Share a space.", 18),
+        Element(ElementKind.HEADING, "Scoring", 19),
+        Element(ElementKind.PARAGRAPH, "Count your points.", 19),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Setup",
+            chunk_type=ChunkType.SECTION,
+            page_start=17,
+            page_end=17,
+            content="Setup\n\nPlace the board.",
+        ),
+        TextChunk(
+            section_path="Scoring",
+            chunk_type=ChunkType.SECTION,
+            page_start=19,
+            page_end=19,
+            content="Scoring\n\nCount your points.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nBard: Gain a point.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nQueen: Play a card.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nRanger: Move a worker.",
+        ),
+        TextChunk(
+            section_path="Cards",
+            chunk_type=ChunkType.GLOSSARY,
+            page_start=18,
+            page_end=18,
+            content="Cards\n\nWife: Share a space.",
+        ),
+    ]

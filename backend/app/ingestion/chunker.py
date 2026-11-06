@@ -1,6 +1,7 @@
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from itertools import groupby
 
 from app.db.models import ChunkType
 from app.ingestion.layout_parser import Element, ElementKind
@@ -29,6 +30,10 @@ class ChunkLimits:
 
 # A section's path and its elements. Its own heading, if it has one, comes first.
 _Section = tuple[str, list[Element]]
+
+# A glossary entry looks like "Term: definition", and it takes a run of them to count as a glossary.
+_GLOSSARY_ENTRY = re.compile(r"[A-Z][^.:!?]{0,40}: \S")
+_MIN_GLOSSARY_ENTRIES = 4
 
 
 def _content(section: list[Element]) -> str:
@@ -156,6 +161,39 @@ def _split_long_table(
     return pieces
 
 
+def _is_glossary_entry(element: Element) -> bool:
+    return element.kind in (ElementKind.PARAGRAPH, ElementKind.LIST_ITEM) and bool(
+        _GLOSSARY_ENTRY.match(element.text)
+    )
+
+
+def _pull_out_glossary(elements: list[Element]) -> tuple[list[Element], list[tuple[str, Element]]]:
+    text: list[Element] = []
+    entries: list[tuple[str, Element]] = []
+    heading = ""
+    for is_entry, group in groupby(elements, key=_is_glossary_entry):
+        run = list(group)
+        if is_entry and len(run) >= _MIN_GLOSSARY_ENTRIES:
+            entries.extend((heading, element) for element in run)
+            continue
+
+        text.extend(run)
+        for element in run:
+            if element.kind == ElementKind.HEADING:
+                heading = element.text
+    return text, entries
+
+
+def _to_chunk(heading: str, section: list[Element], chunk_type: ChunkType) -> TextChunk:
+    return TextChunk(
+        section_path=heading,
+        chunk_type=chunk_type,
+        page_start=min(element.page for element in section),
+        page_end=max(_last_page(element) for element in section),
+        content=_content(section),
+    )
+
+
 def _split_at_headings(elements: list[Element]) -> list[_Section]:
     sections: list[_Section] = [("", [])]
     for element in elements:
@@ -193,23 +231,14 @@ def chunk_elements(
 ) -> list[TextChunk]:
     """Split parsed elements at headings, then merge small sections and split long ones."""
     text, tables = _pull_out_tables(_join_page_breaks(elements))
+    text, entries = _pull_out_glossary(text)
     merged = _merge_small_sections(_split_at_headings(text), count_tokens, limits.min_tokens)
     sections = [
         part
         for heading, section in merged
         for part in _split_long_section(heading, section, count_tokens, limits)
     ]
-    chunks: list[TextChunk] = []
-    for heading, section in sections:
-        chunks.append(
-            TextChunk(
-                section_path=heading,
-                chunk_type=ChunkType.SECTION,
-                page_start=min(element.page for element in section),
-                page_end=max(_last_page(element) for element in section),
-                content=_content(section),
-            )
-        )
+    chunks = [_to_chunk(heading, section, ChunkType.SECTION) for heading, section in sections]
 
     for heading, table in tables:
         for content in _split_long_table(heading, table.text, count_tokens, limits):
@@ -222,5 +251,10 @@ def chunk_elements(
                     content=content,
                 )
             )
+
+    for heading, entry in entries:
+        section = [Element(ElementKind.HEADING, heading, entry.page), entry] if heading else [entry]
+        for _, part in _split_long_section(heading, section, count_tokens, limits):
+            chunks.append(_to_chunk(heading, part, ChunkType.GLOSSARY))
 
     return chunks
