@@ -1259,3 +1259,137 @@ def test_chunk_elements_uses_the_nearest_heading_for_glossary_entries() -> None:
             content="Cards\n\nWife: Share a space.",
         ),
     ]
+
+
+def test_chunk_elements_drops_a_credits_section() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Scoring", 15),
+        Element(ElementKind.PARAGRAPH, "Count your points.", 15),
+        Element(ElementKind.HEADING, "Credits", 16),
+        Element(ElementKind.PARAGRAPH, "Art by Jane Doe.", 16),
+        Element(ElementKind.HEADING, "Variants", 16),
+        Element(ElementKind.PARAGRAPH, "Play with two decks.", 16),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Scoring",
+            chunk_type=ChunkType.SECTION,
+            page_start=15,
+            page_end=15,
+            content="Scoring\n\nCount your points.",
+        ),
+        TextChunk(
+            section_path="Variants",
+            chunk_type=ChunkType.SECTION,
+            page_start=16,
+            page_end=16,
+            content="Variants\n\nPlay with two decks.",
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "heading ",
+    [
+        "CREDITS",
+        "Designers' Acknowledgements",
+        "Acknowledgments",
+        "Playtesters",
+        "Acme Games, Inc.",
+        "Published by Acme Games Inc",
+        "www.example.com/parts",
+    ],
+)
+def test_chunk_elements_drops_sections_with_a_credits_heading(heading: str) -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Scoring", 15),
+        Element(ElementKind.PARAGRAPH, "Count your points.", 15),
+        Element(ElementKind.HEADING, heading, 16),
+        Element(ElementKind.PARAGRAPH, "Art by Jane Doe.", 16),
+        Element(ElementKind.HEADING, "Variants", 16),
+        Element(ElementKind.PARAGRAPH, "Play with two decks.", 16),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Scoring",
+            chunk_type=ChunkType.SECTION,
+            page_start=15,
+            page_end=15,
+            content="Scoring\n\nCount your points.",
+        ),
+        TextChunk(
+            section_path="Variants",
+            chunk_type=ChunkType.SECTION,
+            page_start=16,
+            page_end=16,
+            content="Variants\n\nPlay with two decks.",
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "heading ",
+    [
+        "Earning Credits",
+        "Credits and Debts",
+        "Zinc Mines",
+    ],
+)
+def test_chunk_elements_keeps_a_heading_that_only_contains_a_credits_word(heading: str) -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Scoring", 15),
+        Element(ElementKind.PARAGRAPH, "Count your points.", 15),
+        Element(ElementKind.HEADING, heading, 16),
+        Element(ElementKind.PARAGRAPH, "Gain one coin.", 16),
+        Element(ElementKind.HEADING, "Variants", 16),
+        Element(ElementKind.PARAGRAPH, "Play with two decks.", 16),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Scoring",
+            chunk_type=ChunkType.SECTION,
+            page_start=15,
+            page_end=15,
+            content="Scoring\n\nCount your points.",
+        ),
+        TextChunk(
+            section_path=heading,
+            chunk_type=ChunkType.SECTION,
+            page_start=16,
+            page_end=16,
+            content=f"{heading}\n\nGain one coin.",
+        ),
+        TextChunk(
+            section_path="Variants",
+            chunk_type=ChunkType.SECTION,
+            page_start=16,
+            page_end=16,
+            content="Variants\n\nPlay with two decks.",
+        ),
+    ]
+
+
+def test_chunk_elements_drops_glossary_entries_and_tables_in_credits() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Scoring", 15),
+        Element(ElementKind.PARAGRAPH, "Count your points.", 15),
+        Element(ElementKind.HEADING, "Credits", 16),
+        Element(ElementKind.PARAGRAPH, "Art: Jane Doe.", 16),
+        Element(ElementKind.PARAGRAPH, "Design: John Roe.", 16),
+        Element(ElementKind.PARAGRAPH, "Editing: Ann Poe.", 16),
+        Element(ElementKind.PARAGRAPH, "Layout: Sam Moe.", 16),
+        Element(ElementKind.TABLE, TABLE, 16),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Scoring",
+            chunk_type=ChunkType.SECTION,
+            page_start=15,
+            page_end=15,
+            content="Scoring\n\nCount your points.",
+        )
+    ]

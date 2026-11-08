@@ -35,6 +35,11 @@ _Section = tuple[str, list[Element]]
 _GLOSSARY_ENTRY = re.compile(r"[A-Z][^.:!?]{0,40}: \S")
 _MIN_GLOSSARY_ENTRIES = 4
 
+# Headings of sections about who made the game, not how to play it.
+_CREDITS_HEADING = re.compile(
+    r"credits|.*acknowledge?ments?|playtesters|.*\binc\.?|www\..*", re.IGNORECASE
+)
+
 
 def _content(section: list[Element]) -> str:
     return "\n\n".join(element.text for element in section)
@@ -121,6 +126,17 @@ def _split_long_section(
         current.append(piece)
     parts.append((heading, current))
     return parts
+
+
+def _drop_credits(elements: list[Element]) -> list[Element]:
+    kept: list[Element] = []
+    dropping = False
+    for element in elements:
+        if element.kind == ElementKind.HEADING:
+            dropping = bool(_CREDITS_HEADING.fullmatch(element.text))
+        if not dropping:
+            kept.append(element)
+    return kept
 
 
 def _pull_out_tables(elements: list[Element]) -> tuple[list[Element], list[tuple[str, Element]]]:
@@ -230,7 +246,7 @@ def chunk_elements(
     elements: list[Element], count_tokens: Callable[[str], int], limits: ChunkLimits
 ) -> list[TextChunk]:
     """Split parsed elements at headings, then merge small sections and split long ones."""
-    text, tables = _pull_out_tables(_join_page_breaks(elements))
+    text, tables = _pull_out_tables(_drop_credits(_join_page_breaks(elements)))
     text, entries = _pull_out_glossary(text)
     merged = _merge_small_sections(_split_at_headings(text), count_tokens, limits.min_tokens)
     sections = [
