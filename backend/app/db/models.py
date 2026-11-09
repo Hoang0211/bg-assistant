@@ -22,6 +22,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+# Size of the vectors from the embedding model; changing it needs a migration.
+EMBEDDING_DIMENSION = 768
+embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSION))
+
 
 class Base(DeclarativeBase):
     """Base class for all ORM models; holds the shared table metadata."""

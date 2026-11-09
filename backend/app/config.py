@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     # A chunk's last element is repeated in the next chunk if it's at most this long.
     chunk_overlap_tokens: int = 50
 
+    # Embedding model from Hugging Face. Changing it means reindexing, and a migration if its
+    # vector size differs.
+    embedding_model: str = "BAAI/bge-base-en-v1.5"
+
     # Lists frontend origins allowed to call API from browser
     cors_origins: list[str] = ["http://localhost:3000"]
 
