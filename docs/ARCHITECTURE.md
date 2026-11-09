@@ -125,7 +125,7 @@ Games and rulebooks are separate operations: a game is created from its fields a
      - With no headings, the whole text is one section with an empty path, so the long-section splitter cuts it at paragraph breaks into ~350-token chunks; no separate fallback is needed.
    - **Prefix:** each chunk starts with its section path only (e.g. `Trading`). The game name is added when chunks are put into a prompt.
    - **Embed and store:** embed with bge-base, write the chunks, save the parse report.
-6. **Status.** The UI polls `GET /api/rulebooks/{id}/status` and shows a progress badge. When ingestion finishes, the game page shows any parse warnings.
+6. **Status.** There's no separate status endpoint: each rulebook in `GET /api/games/{id}/rulebooks` carries its `status`, `error` and parse report, so one request covers every upload on the page. The UI polls that list every few seconds while any rulebook is `uploaded` or `processing`, shows a badge per rulebook, and stops when all are `ready` or `failed`. A ready rulebook shows its parse warnings.
 
 ## Flow 2: Manage games and rulebooks
 
@@ -257,7 +257,7 @@ Tests are written with each feature, not at the end. A milestone is done only wh
 
 2. **Games data and API:** models and migrations (expansion rules, unique `sha256`) and `/api/games`. Tests: the testcontainers fixture with per-test rollback, CRUD, expansion validation, cascading deletes, `sha256` uniqueness.
 3. **Rulebooks API:** adding a rulebook to a game (size limit, PyMuPDF check and page count, the duplicate check, file storage), listing all and per game, rename and move, delete with its file, serving the file with range requests, and deleting a game's files with the game. No LLM yet. Tests: every rejection leaving no row and no file, a failed commit removing the written file, duplicates across games, rename and move, delete removing the file, a range request returning 206, game deletion removing files.
-4. **Ingestion:** the Docling parser, the chunker, prefixes, the embedder, the parse report, the background job and status endpoint, moving a rulebook updating its chunks, `just reindex` and `just add-rulebook`. Tests: every chunker rule, the fake embedder, the three layout fixtures, parse report flags, transactional reindex, job status, a move updating chunks.
+4. **Ingestion:** the Docling parser, the chunker, prefixes, the embedder, the parse report (returned with each rulebook), the background job, moving a rulebook updating its chunks, `just reindex` and `just add-rulebook`. Tests: every chunker rule, the fake embedder, the three layout fixtures, parse report flags, transactional reindex, job status, a move updating chunks.
 5. **Retrieval and evaluation:** hybrid search, RRF, the reranker, the golden dataset and retrieval metrics; tune the chunker and candidate counts. Tests: RRF, scoping to the chosen game, reranker ordering, current game names.
 6. **Chat graph:** `LLMProvider` (OpenAI and fake) with `web_search`, LangSmith tracing from this first LLM call on, `just test-live`, state, the graph with the Postgres checkpointer, router, recommendation nodes, the agent loop, both interrupts, `web_answer`, the chat API with SSE, the routing and answer evals, and `just chat`. Tests: graph tests, filter relaxation, SSE mapping, API interrupt and resume, separate conversation state, live tests.
 
