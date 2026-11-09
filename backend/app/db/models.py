@@ -24,7 +24,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # Size of the vectors from the embedding model; changing it needs a migration.
 EMBEDDING_DIMENSION = 768
-embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSION))
 
 
 class Base(DeclarativeBase):
@@ -159,7 +158,7 @@ class Chunk(Base):
     tsv: Mapped[str] = mapped_column(
         TSVECTOR, Computed("to_tsvector('english', content)", persisted=True)
     )
-    embedding: Mapped[list[float]] = mapped_column(Vector(768))
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSION))
 
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
