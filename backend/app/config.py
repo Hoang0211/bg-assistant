@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     # Pages with fewer characters in their text layer are parsed with OCR.
     ocr_min_page_chars: int = 100
 
+    # Times the parse is tried in its own process before the rulebook is marked as failed.
+    parse_attempts: int = 3
+
+    # Off in tests, so starting the app there doesn't ingest rulebooks from the dev database.
+    run_ingestion_worker: bool = True
+
     # Sections with fewer tokens are merged into a neighbouring section.
     chunk_min_tokens: int = 80
 

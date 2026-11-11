@@ -364,7 +364,7 @@
           "rulebooks"
         ],
         "summary": "Add Rulebook",
-        "description": "Add a PDF as one of the game's rulebooks.",
+        "description": "Add a PDF as one of the game's rulebooks and queue it for ingestion.",
         "operationId": "add_rulebook_api_games__game_id__rulebooks_post",
         "parameters": [
           {
@@ -1069,6 +1069,36 @@
         "title": "HealthResponse",
         "description": "Result of the API health check."
       },
+      "ParseReportRead": {
+        "properties": {
+          "chunk_count": {
+            "type": "integer",
+            "title": "Chunk Count"
+          },
+          "ocr_pages": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Ocr Pages"
+          },
+          "empty_pages": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Empty Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chunk_count",
+          "ocr_pages",
+          "empty_pages"
+        ],
+        "title": "ParseReportRead",
+        "description": "How well a rulebook parsed; the UI shows warnings for the listed pages."
+      },
       "RulebookRead": {
         "properties": {
           "id": {
@@ -1105,6 +1135,16 @@
             ],
             "title": "Error"
           },
+          "parse_report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParseReportRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -1125,6 +1165,7 @@
           "page_count",
           "status",
           "error",
+          "parse_report",
           "created_at",
           "updated_at"
         ],

@@ -2,8 +2,6 @@ import math
 import random
 from typing import Protocol
 
-from sentence_transformers import SentenceTransformer
-
 from app.db.models import EMBEDDING_DIMENSION
 
 # BGE expects this before a search query, but not before the passages being searched.
@@ -41,6 +39,9 @@ class BgeEmbedder:
     """Embeds text with a BGE model, loaded once when created."""
 
     def __init__(self, model_name: str) -> None:
+        # Imported here because it loads PyTorch (about 10 s), and only ingestion needs it.
+        from sentence_transformers import SentenceTransformer
+
         self._model = SentenceTransformer(model_name)
 
     def count_tokens(self, text: str) -> int:

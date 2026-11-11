@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pymupdf
 
-from app.ingestion.layout_parser import Element, ElementKind, parse_pdf
+from app.ingestion.elements import Element, ElementKind
+from app.ingestion.layout_parser import parse_pdf
 from tests.helpers import add_text_page
 
 BODY = (

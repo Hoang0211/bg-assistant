@@ -19,7 +19,7 @@ if not config.get_main_option("sqlalchemy.url"):
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Autogenerate compares these models with the database to write migrations.
 target_metadata = Base.metadata

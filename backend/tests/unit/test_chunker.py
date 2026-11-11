@@ -2,7 +2,7 @@ import pytest
 
 from app.db.models import ChunkType
 from app.ingestion.chunker import ChunkLimits, TextChunk, chunk_elements
-from app.ingestion.layout_parser import Element, ElementKind
+from app.ingestion.elements import Element, ElementKind
 
 
 def count_words(text: str) -> int:

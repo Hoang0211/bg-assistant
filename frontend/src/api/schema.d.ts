@@ -91,7 +91,7 @@ export interface paths {
         put?: never;
         /**
          * Add Rulebook
-         * @description Add a PDF as one of the game's rulebooks.
+         * @description Add a PDF as one of the game's rulebooks and queue it for ingestion.
          */
         post: operations["add_rulebook_api_games__game_id__rulebooks_post"];
         delete?: never;
@@ -315,6 +315,18 @@ export interface components {
             database: "ok" | "unreachable";
         };
         /**
+         * ParseReportRead
+         * @description How well a rulebook parsed; the UI shows warnings for the listed pages.
+         */
+        ParseReportRead: {
+            /** Chunk Count */
+            chunk_count: number;
+            /** Ocr Pages */
+            ocr_pages: number[];
+            /** Empty Pages */
+            empty_pages: number[];
+        };
+        /**
          * RulebookRead
          * @description A rulebook as returned by the API, with its game's current name.
          */
@@ -332,6 +344,7 @@ export interface components {
             status: components["schemas"]["RulebookStatus"];
             /** Error */
             error: string | null;
+            parse_report: components["schemas"]["ParseReportRead"] | null;
             /**
              * Created At
              * Format: date-time

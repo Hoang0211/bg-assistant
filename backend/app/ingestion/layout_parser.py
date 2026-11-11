@@ -1,6 +1,4 @@
 import re
-from dataclasses import dataclass
-from enum import StrEnum
 from functools import cache
 from pathlib import Path
 
@@ -14,28 +12,8 @@ from docling_core.types.doc.items.text import TextItem
 from docling_core.types.doc.labels import DocItemLabel
 
 from app.config import get_settings
+from app.ingestion.elements import Element, ElementKind
 from app.ingestion.pdf_info import low_text_pages
-
-
-class ElementKind(StrEnum):
-    """What kind of content an element holds."""
-
-    HEADING = "heading"
-    PARAGRAPH = "paragraph"
-    LIST_ITEM = "list_item"
-    TABLE = "table"
-    CAPTION = "caption"
-
-
-@dataclass(frozen=True)
-class Element:
-    """One piece of a parsed page, in reading order."""
-
-    kind: ElementKind
-    text: str
-    page: int
-    last_page: int | None = None  # set when the text carries on over a page break
-
 
 # Labels not listed here (pictures, charts, formulas, code, the table of contents) are skipped.
 _KINDS: dict[DocItemLabel, ElementKind] = {

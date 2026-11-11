@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from itertools import groupby
 
 from app.db.models import ChunkType
-from app.ingestion.layout_parser import Element, ElementKind
+from app.ingestion.elements import Element, ElementKind
 
 
 @dataclass(frozen=True)
