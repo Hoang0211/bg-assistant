@@ -15,7 +15,7 @@ The design (stack and reasons, data model, flows, chat graph, RAG pipeline, test
 Run `just` to list everything. The main ones:
 
 - `just dev`: Postgres in Docker plus both dev servers with reload. `just db` starts only Postgres.
-- `just up` / `just down`: the whole app in containers / remove the containers (data is kept in the `pgdata` volume).
+- `just up` / `just down`: the whole app in containers / remove the containers (the database and the downloaded models are kept in volumes).
 - `just lint`, `just format`, `just test`, `just e2e`: also available per side, e.g. `just test-backend`.
 - `just migrate`: apply Alembic migrations.
 - `just gen-types`: regenerate `frontend/openapi.json` and `frontend/src/api/schema.d.ts` from the backend. Run it after any API change; CI's contract job fails if they're stale.
@@ -44,7 +44,7 @@ Run `just` to list everything. The main ones:
 - `astral-sh/setup-uv` publishes no floating major tag; pin an exact version in `.github/workflows/ci.yml`.
 - Compose needs v2.24+ (`env_file` with `required: false`).
 - Async sessions can't lazy-load: reading an expired attribute raises `MissingGreenlet`. `Base` in `backend/app/db/models.py` sets `eager_defaults=True` so database-computed values (like `updated_at`) come back with `RETURNING`; load relationships explicitly.
-- pytest runs with `HF_HUB_OFFLINE=1`, so the models must already be downloaded: run `uv run docling-tools models download` and `uv run python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-base-en-v1.5')"` once from `backend/`. Otherwise the parser and embedder tests fail because the model isn't found.
+- pytest runs with `HF_HUB_OFFLINE=1`, so the models must already be downloaded: run `just download-models` once. Otherwise the parser and embedder tests fail because the model isn't found.
 - Docling's OCR crashed at random on Windows with native heap corruption (`0xc0000374`, 9 of 33 runs) while the parse ran inside the API process, and `try/except` can't catch that. It hasn't happened in 99 runs since, with each parse in its own process as the app now does it, on the same library versions. The parse child is still retried up to `parse_attempts` times, in case it comes back.
 
 ## Progress
@@ -57,7 +57,6 @@ Run `just` to list everything. The main ones:
 - Milestone 3, rulebooks API: rulebooks managed apart from games (several per game, or none); PDF uploads checked for size (413), duplicates across the library by `sha256` (422 with `duplicate_of`) and readability with PyMuPDF, which also reads the page count; files stored as `{sha256}.pdf`, written before the row and removed after a delete commits; list, rename, move and delete; the file download with range requests for the PDF viewer; service and API tests.
 
 **Open notes:**
-- Milestone 4: add the Hugging Face and Docling model cache to the CI backend and e2e jobs.
 - Milestone 4: configure logging at startup (`logging.basicConfig` in `main.py`) for the ingestion job's progress logs. Until then only warnings and errors print, through Python's fallback handler.
 - Milestone 4: once ingestion and `reindex` also read stored PDFs, move the file helpers (`_write_file`, `remove_files`) from `services/rulebooks.py` into an `app/storage.py` that turns a `storage_path` into a real path in one place.
 - Milestone 5: add eval questions about short terms that are printed as headings (almanac-style rulebooks). They're merged into neighbouring chunks, so check whether they're still found, and tune `chunk_min_tokens` if not.
@@ -65,6 +64,7 @@ Run `just` to list everything. The main ones:
 - Milestone 7: the health status becomes a banner shown only on problems, with an adaptive polling interval and a request timeout; add a server-side API URL (`http://backend:8000` in compose) once Server Components call the API.
 - Milestone 8: the forms validate with zod before sending, so the server's 422s are a backstop. They come in two shapes: FastAPI's list of `{loc, msg, type}` for body, query and path validation (merged PATCH errors have no `"body"` in `loc`), and `{"detail": "message"}` for rule violations, which the UI must show.
 - Milestone 8: e2e tests start writing data, so local `just e2e` should run against a throwaway stack (own compose project, no volume) instead of the dev database; otherwise junk accumulates and the `sha256` duplicate check fails on re-runs.
+- Milestone 8: once e2e uploads rulebooks, the e2e job needs the models: restore the same CI cache and mount it into the backend container's `/root/.cache/huggingface` (a compose override), or every run downloads about 1 GB.
 - Milestone 8: the PDF viewer needs CORS `expose_headers` for `Accept-Ranges` and `Content-Range`, or pdf.js downloads the whole file instead of using range requests.
 - Phase B: add `error.tsx` boundaries; decide whether to enable `cacheComponents`.
 - Phase C: publish the static Storybook to GitHub Pages (a deploy job in CI) as a live demo link; it only uses MSW mock data.

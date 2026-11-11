@@ -97,6 +97,11 @@ gen-types:
     uv run python -m app.export_openapi ../frontend/openapi.json
     npm --prefix ../frontend run gen:api
 
+# Download the embedding and Docling models (about 1 GB, once per machine; the tests need them).
+[working-directory: 'backend']
+download-models:
+    uv run python -m app.ingestion.download_models
+
 # --- Engine ---
 
 # Parse, chunk and embed the stored rulebooks again: `just reindex`, or `just reindex --game 3`.

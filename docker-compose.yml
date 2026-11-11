@@ -39,6 +39,8 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/data:/app/data
+      # Models download here on the first ingestion; the volume keeps them across `just down`.
+      - models:/root/.cache
     depends_on:
       db:
         condition: service_healthy
@@ -67,3 +69,4 @@ services:
 
 volumes:
   pgdata:
+  models:

@@ -36,6 +36,12 @@ def _converter(ocr: bool) -> DocumentConverter:
     )
 
 
+def load_models() -> None:
+    """Load Docling's models for both converters, downloading any that aren't cached yet."""
+    for ocr in (False, True):
+        _converter(ocr=ocr).initialize_pipeline(InputFormat.PDF)
+
+
 def _compact_table(markdown: str) -> str:
     return re.sub(r"-{3,}", "---", re.sub(r" {2,}", " ", markdown))
 
