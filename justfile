@@ -96,3 +96,10 @@ migrate:
 gen-types:
     uv run python -m app.export_openapi ../frontend/openapi.json
     npm --prefix ../frontend run gen:api
+
+# --- Engine ---
+
+# Parse, chunk and embed the stored rulebooks again: `just reindex`, or `just reindex --game 3`.
+[working-directory: 'backend']
+reindex *args:
+    uv run python -m app.cli reindex {{args}}

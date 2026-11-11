@@ -32,7 +32,7 @@ Run `just` to list everything. The main ones:
 - Chunk text is prefixed with its section path only, never the game name.
 - Docling and sentence-transformers take seconds to import, so keep them off the app's startup path: shared types live in modules that import no heavy library, code that needs the parser or embedder gets it passed in (created in the lifespan or the CLI), and the two places that load them, `parse_process._main` and `BgeEmbedder.__init__`, import them inside the function. A test checks that importing `app.main` loads neither.
 - The frontend calls the backend only through the typed client in `frontend/src/api/client.ts`.
-- New engine commands (`test-live`, `add-rulebook`, `reindex`, `eval`, `chat`) are added to the `justfile` in the milestone that builds them.
+- New engine commands (`test-live`, `reindex`, `eval`, `chat`) are added to the `justfile` in the milestone that builds them.
 - `main` is protected: every change goes through a pull request from a feature branch (e.g. `feat/games-api`), needs all four CI checks green, and is squash-merged. Pull request titles follow Conventional Commits, because they become the commit messages on `main`.
 - Update the Progress section below in the pull request that finishes each milestone.
 

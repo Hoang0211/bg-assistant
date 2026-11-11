@@ -2,7 +2,6 @@ import asyncio
 import hashlib
 from pathlib import Path
 
-import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -16,14 +15,6 @@ ELEMENTS = [
     Element(ElementKind.HEADING, "Setup", 1),
     Element(ElementKind.PARAGRAPH, "Roll the dice.", 1),
 ]
-
-
-@pytest.fixture
-def sessionmaker(db_session: AsyncSession) -> async_sessionmaker[AsyncSession]:
-    """Worker sessions that join the test's transaction, so their changes are rolled back too."""
-    return async_sessionmaker(
-        db_session.bind, join_transaction_mode="create_savepoint", expire_on_commit=False
-    )
 
 
 async def _add_rulebook(

@@ -46,7 +46,7 @@ bg-assistant/
 │  ├─ pyproject.toml, uv.lock, alembic/, Dockerfile
 │  ├─ app/
 │  │  ├─ main.py, config.py (pydantic-settings), export_openapi.py
-│  │  ├─ cli.py           add-rulebook, chat and reindex commands for using the engine from a terminal
+│  │  ├─ cli.py           reindex and chat commands for using the engine from a terminal
 │  │  ├─ tracing.py       LangSmith setup: wrapped OpenAI client, run metadata helpers
 │  │  ├─ errors.py        error kinds the services raise (NotFoundError, RuleViolationError, TooLargeError), free of HTTP
 │  │  ├─ api/             health.py, games.py, rulebooks.py, chat.py, deps.py,
@@ -146,7 +146,7 @@ Games and rulebooks are separate operations: a game is created from its fields a
 
 **Ingestion and reindexing**
 - Ingestion runs once per rulebook; chat only embeds the question. Each model loads once per backend process. The embedding model, and the libraries it needs, load on the first ingestion job rather than at startup, so `--reload` in `just dev` doesn't wait about 10 s for them; Docling loads only in the parse child process. Milestone 6 decides whether chat shares that instance or loads it at startup, so the first question doesn't wait.
-- `just reindex [--game <id>]` re-runs parse → chunk → embed from the stored PDFs, for one game or all, after a chunker or embedding change. Each rulebook's chunks are replaced in one transaction, so a failure keeps the old chunks.
+- `just reindex [--game <id>]` re-runs parse → chunk → embed from the stored PDFs, for one game or all, after a chunker or embedding change. Each rulebook's chunks are replaced in one transaction, so a failure keeps the old chunks. It prints each rulebook's result and exits with code 1 if any failed.
 
 ## Flow 3: Chat
 
@@ -258,7 +258,7 @@ Tests are written with each feature, not at the end. A milestone is done only wh
 
 2. **Games data and API:** models and migrations (expansion rules, unique `sha256`) and `/api/games`. Tests: the testcontainers fixture with per-test rollback, CRUD, expansion validation, cascading deletes, `sha256` uniqueness.
 3. **Rulebooks API:** adding a rulebook to a game (size limit, PyMuPDF check and page count, the duplicate check, file storage), listing all and per game, rename and move, delete with its file, serving the file with range requests, and deleting a game's files with the game. No LLM yet. Tests: every rejection leaving no row and no file, a failed commit removing the written file, duplicates across games, rename and move, delete removing the file, a range request returning 206, game deletion removing files.
-4. **Ingestion:** the Docling parser, the chunker, prefixes, the embedder, the parse report (returned with each rulebook), the background job, moving a rulebook updating its chunks, `just reindex` and `just add-rulebook`. Tests: every chunker rule, the fake embedder, the three layout fixtures, parse report flags, transactional reindex, job status, a move updating chunks.
+4. **Ingestion:** the Docling parser, the chunker, prefixes, the embedder, the parse report (returned with each rulebook), the background job, moving a rulebook updating its chunks, and `just reindex`. Tests: every chunker rule, the fake embedder, the three layout fixtures, parse report flags, transactional reindex, job status, a move updating chunks.
 5. **Retrieval and evaluation:** hybrid search, RRF, the reranker, the golden dataset and retrieval metrics; tune the chunker and candidate counts. Tests: RRF, scoping to the chosen game, reranker ordering, current game names.
 6. **Chat graph:** `LLMProvider` (OpenAI and fake) with `web_search`, LangSmith tracing from this first LLM call on, `just test-live`, state, the graph with the Postgres checkpointer, router, recommendation nodes, the agent loop, both interrupts, `web_answer`, the chat API with SSE, the routing and answer evals, and `just chat`. Tests: graph tests, filter relaxation, SSE mapping, API interrupt and resume, separate conversation state, live tests.
 
