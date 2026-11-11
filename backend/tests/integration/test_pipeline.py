@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import pymupdf
@@ -61,6 +62,20 @@ async def test_ingest_rulebook_stores_the_chunks_and_the_report(
     assert list(chunk.embedding) == pytest.approx(
         FakeEmbedder().embed_query(chunk.content), abs=1e-6
     )
+
+
+async def test_ingest_rulebook_logs_its_progress(
+    db_session: AsyncSession, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    rulebook = await _add_rulebook(db_session, tmp_path)
+    caplog.set_level(logging.INFO, logger="app.ingestion.pipeline")
+
+    await ingest_rulebook(db_session, rulebook.id, tmp_path, lambda path: ELEMENTS, FakeEmbedder())
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert messages[0] == f"ingesting rulebook {rulebook.id} (rules.pdf, 2 pages)"
+    assert messages[1].startswith(f"rulebook {rulebook.id} ready: 1 chunks in ")
+    assert len(messages) == 2
 
 
 async def test_ingest_rulebook_replaces_the_old_chunks(

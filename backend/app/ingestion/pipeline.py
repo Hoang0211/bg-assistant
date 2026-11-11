@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
@@ -49,6 +50,13 @@ async def ingest_rulebook(
         logger.info("rulebook %d was deleted before it was ingested", rulebook_id)
         return
 
+    logger.info(
+        "ingesting rulebook %d (%s, %d pages)",
+        rulebook_id,
+        rulebook.filename,
+        rulebook.page_count,
+    )
+    start = time.perf_counter()
     rulebook.status = RulebookStatus.PROCESSING
     rulebook.error = None
     await session.commit()
@@ -74,6 +82,12 @@ async def ingest_rulebook(
         rulebook.parse_report = asdict(report)
         rulebook.status = RulebookStatus.READY
         await session.commit()
+        logger.info(
+            "rulebook %d ready: %d chunks in %.0f s",
+            rulebook_id,
+            len(chunks),
+            time.perf_counter() - start,
+        )
     except Exception as error:
         logger.exception("ingesting rulebook %d failed", rulebook_id)
         # After a rollback the loaded rulebook is expired, and reading it would need a lazy

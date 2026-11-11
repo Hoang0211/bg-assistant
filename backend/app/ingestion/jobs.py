@@ -63,6 +63,7 @@ class IngestionWorker:
 
     async def _ingest(self, rulebook_id: int) -> None:
         if self._embedder is None:
+            logger.info("loading the embedding model")
             self._embedder = await asyncio.to_thread(self._make_embedder)
         async with self._sessionmaker() as session:
             await ingest_rulebook(

@@ -17,6 +17,7 @@ from app.ingestion.elements import Element
 from app.ingestion.embedder import BgeEmbedder, Embedder
 from app.ingestion.parse_process import parse_in_process
 from app.ingestion.pipeline import ingest_rulebook
+from app.log_setup import configure_logging
 
 
 async def reindex(
@@ -83,6 +84,7 @@ async def _run(args: argparse.Namespace) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    configure_logging()
     args = _parser().parse_args(argv)
     # Async psycopg on Windows needs the selector event loop.
     loop_factory = asyncio.SelectorEventLoop if sys.platform == "win32" else None

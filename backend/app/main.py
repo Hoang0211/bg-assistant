@@ -14,6 +14,7 @@ from app.db.session import create_db_engine, create_sessionmaker
 from app.ingestion.embedder import BgeEmbedder
 from app.ingestion.jobs import IngestionWorker
 from app.ingestion.parse_process import parse_in_process
+from app.log_setup import configure_logging
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Run startup work before the app serves requests, and cleanup after it stops."""
+    configure_logging()
     settings = get_settings()
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
 
