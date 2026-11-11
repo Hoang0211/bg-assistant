@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Game, Rulebook
 from app.errors import NotFoundError, RuleViolationError
 from app.schemas.games import GameCreate, GameFilters, GameUpdate
-from app.services.rulebooks import remove_files
+from app.storage import remove_files
 
 
 class GameNotFoundError(NotFoundError):
