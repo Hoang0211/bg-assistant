@@ -45,7 +45,7 @@ Run `just` to list everything. The main ones:
 - Compose needs v2.24+ (`env_file` with `required: false`).
 - Async sessions can't lazy-load: reading an expired attribute raises `MissingGreenlet`. `Base` in `backend/app/db/models.py` sets `eager_defaults=True` so database-computed values (like `updated_at`) come back with `RETURNING`; load relationships explicitly.
 - pytest runs with `HF_HUB_OFFLINE=1`, so the models must already be downloaded: run `uv run docling-tools models download` and `uv run python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-base-en-v1.5')"` once from `backend/`. Otherwise the parser and embedder tests fail because the model isn't found.
-- Docling's OCR crashes at random on Windows with native heap corruption (`0xc0000374`; 9 of 33 runs on a one-page scan), which `try/except` can't catch. The parse runs in a child process that's tried up to `parse_attempts` times, so a crash costs a retry, but the odds grow with every OCR'd page: a scanned rulebook of many pages will likely end `failed` on Windows.
+- Docling's OCR crashed at random on Windows with native heap corruption (`0xc0000374`, 9 of 33 runs) while the parse ran inside the API process, and `try/except` can't catch that. It hasn't happened in 99 runs since, with each parse in its own process as the app now does it, on the same library versions. The parse child is still retried up to `parse_attempts` times, in case it comes back.
 
 ## Progress
 
@@ -60,7 +60,6 @@ Run `just` to list everything. The main ones:
 - Milestone 4: add the Hugging Face and Docling model cache to the CI backend and e2e jobs.
 - Milestone 4: configure logging at startup (`logging.basicConfig` in `main.py`) for the ingestion job's progress logs. Until then only warnings and errors print, through Python's fallback handler.
 - Milestone 4: once ingestion and `reindex` also read stored PDFs, move the file helpers (`_write_file`, `remove_files`) from `services/rulebooks.py` into an `app/storage.py` that turns a `storage_path` into a real path in one place.
-- Milestone 4: check whether the OCR crash also happens in the Linux container (`just up`). If it doesn't, add to the Gotcha that scanned rulebooks should be ingested with `just up`.
 - Milestone 5: add eval questions about short terms that are printed as headings (almanac-style rulebooks). They're merged into neighbouring chunks, so check whether they're still found, and tune `chunk_min_tokens` if not.
 - Milestone 6: create `backend/app/tracing.py` with the first LLM call (the router); add `just test-live`.
 - Milestone 7: the health status becomes a banner shown only on problems, with an adaptive polling interval and a request timeout; add a server-side API URL (`http://backend:8000` in compose) once Server Components call the API.
