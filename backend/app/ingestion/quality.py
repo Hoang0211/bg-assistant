@@ -9,7 +9,7 @@ class ParseReport:
 
     chunk_count: int
     ocr_pages: list[int]  # read with OCR, so the text may have recognition errors
-    empty_pages: list[int]  # no text found, even with OCR
+    empty_pages: list[int]  # no text kept: the page has none, or it was all inside pictures
 
 
 def build_report(
