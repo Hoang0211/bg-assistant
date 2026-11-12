@@ -63,7 +63,7 @@ bg-assistant/
 │  │  └─ chat/            state.py, graph.py, prompts.py, streaming.py (graph stream → SSE events)
 │  │                      nodes/ router.py, recommend.py, rules_agent.py, tools.py, clarify.py,
 │  │                             reply.py, web_answer.py
-│  ├─ eval/               golden datasets, run_eval.py, reports/
+│  ├─ eval/               golden_questions.json, library.json, run_eval.py, reports/
 │  ├─ data/uploads/       uploaded rulebook PDFs (gitignored; mounted into the backend container)
 │  └─ tests/              unit/, integration/, fixtures/ (small sample PDFs)
 ├─ frontend/
@@ -81,7 +81,7 @@ bg-assistant/
 ├─ docker-compose.yml     db (pgvector), backend, frontend
 ├─ justfile               every development command
 ├─ .pre-commit-config.yaml
-└─ .github/workflows/     ci.yml, eval.yml
+└─ .github/workflows/     ci.yml
 ```
 
 ## Data model
@@ -207,13 +207,14 @@ The `rules_agent` node calls `chat_model` with four tools. Conditional edges sen
 
 ## Evaluation
 
-- `backend/eval/` holds a golden dataset of about 30–50 questions with expected pages, from 2–3 freely available rulebooks.
-- **Retrieval (no LLM, free):** Recall@k, MRR and nDCG, comparing vector-only, full-text-only, hybrid, and hybrid + reranker. A retrieved chunk is a hit when an expected page falls inside its `page_start`–`page_end` range; an answer spread over two pages lists both, and covering either counts.
-- **Parsers (milestone 5b):** the retrieval eval runs on both parsers, plus how much of each page's PDF text the parse kept (to catch dropped or invented text), the cost and the time. The winner stays.
-- **Answers (LLM-as-judge):** faithfulness, correctness and citation accuracy, plus clarification behaviour (asks when it should, stays quiet when it shouldn't) and a few out-of-scope questions (declines, then offers web search only for those).
+- **Golden questions:** `backend/eval/golden_questions.json` holds 30 questions from 7 rulebooks across 5 games (Sea Salt & Paper with its Extra Salt and Extra Pepper expansions, Rebel Princess, Splendor, Catan, Power Grid), written from the PDFs before looking at any retrieval results. Each lists where its answer is printed (rulebook file and pages), a short answer, and tags for what makes it hard (text in pictures, OCR, tables, callouts, short sections, answers that change with an expansion). The PDFs aren't committed: they live in the git-ignored `backend/data/rulebooks/`, and the questions only point at pages.
+- **Eval database:** the eval runs against its own database, `bg_assistant_eval` in the same Postgres, never the dev library, so adding or deleting games in the app can't change a score. `just eval-ingest` rebuilds it through the normal ingestion pipeline, from the PDFs and `backend/eval/library.json` (each game, which games are its expansions, and its rulebook file). Run it after a parser or chunker change.
+- **Retrieval (no LLM, free):** Recall@k, MRR and nDCG, comparing vector-only, full-text-only, hybrid, and hybrid + reranker. Each question searches its game's whole family (the base game and all its expansions), as chat would. A retrieved chunk is a hit when it comes from an expected rulebook and an expected page falls inside its `page_start`–`page_end` range; covering any expected place counts. Pages stand in for the right text, so a chunk on the right page counts even if it's about something else.
+- **Parsers (milestone 5b):** the two parsers are compared on the retrieval eval, on how much of each page's PDF text the parse kept (to catch dropped or invented text), on an answer check, and on cost and time. The answer check sends each question's top 5 chunks to the chat model and has a judge model compare the answer with the golden `answer`. It's the only measure that sees whether a chunk's text is usable, such as a table kept as rows rather than loose numbers. With 30 questions, a gap of one or two is noise, so the questions where the parsers disagree are read by hand. The winner stays.
+- **Answers (LLM-as-judge, milestone 6):** faithfulness, correctness and citation accuracy, reusing the judge from 5b's answer check, plus clarification behaviour (asks when it should, stays quiet when it shouldn't; the `expansion-dependent` questions are the cases where it should ask) and a few out-of-scope questions (declines, then offers web search only for those).
 - **Routing:** about 40 labelled messages, including tricky ones; accuracy and a confusion matrix.
-- Results go into a Markdown report, and the README shows the results table.
-- `eval.yml` runs the retrieval eval nightly and on demand. The routing and answer evals spend OpenAI credit, so they run on demand only, and are skipped when the `OPENAI_API_KEY` secret isn't set. Locally, `just eval` runs retrieval only and `just eval --all` runs all three.
+- **Reports:** each run writes a Markdown report to `backend/eval/reports/`. Reports are committed, so a pull request shows its effect on the scores, and the README shows the final table.
+- **Local only:** the rulebooks can't be committed, so CI has nothing to ingest, and a score means something only next to another run. `just eval` runs retrieval; `just eval --all` adds routing and answers, which spend OpenAI credit. CI runs unit tests of the metric functions on hand-made rankings.
 
 ## Testing strategy
 
@@ -261,9 +262,9 @@ Tests are written with each feature, not at the end. A milestone is done only wh
 3. **Rulebooks API:** adding a rulebook to a game (size limit, PyMuPDF check and page count, the duplicate check, file storage), listing all and per game, rename and move, delete with its file, serving the file with range requests, and deleting a game's files with the game. No LLM yet. Tests: every rejection leaving no row and no file, a failed commit removing the written file, duplicates across games, rename and move, delete removing the file, a range request returning 206, game deletion removing files.
 4. **Ingestion:** the Docling parser, the chunker, prefixes, the embedder, the parse report (returned with each rulebook), the background job, moving a rulebook updating its chunks, and `just reindex`. Tests: every chunker rule, the fake embedder, the three layout fixtures, parse report flags, transactional reindex, job status, a move updating chunks.
 
-5a. **Retrieval and evaluation:** hybrid search, RRF, the reranker, the golden dataset and retrieval metrics; tune the chunker (first: never merge small sections across a page break) and the candidate counts. Tests: RRF, scoping to the chosen game, reranker ordering, current game names.
+5a. **Retrieval and evaluation:** hybrid search, RRF, the reranker, the eval database (`just eval-ingest`), the golden questions and retrieval metrics (`just eval`), and a baseline report; then tune the chunker (first: never merge small sections across a page break), try `traverse_pictures=True`, and tune the candidate counts. Tests: RRF, scoping to the chosen game, reranker ordering, current game names, the metric functions.
 
-5b. **LLM parser:** `LLMProvider` (OpenAI and fake), LangSmith tracing from this first LLM call on, and `just test-live`. A parser sends each page image to a vision model, which writes it as Markdown following a fixed contract (verbatim text, real headings with levels, captions and box titles as bold text, informative text in pictures written out, no page numbers or hidden copies); our code adds a marker for each page. A chunker splits at the Markdown headings and never merges across a page. 5a's eval compares it with Docling and the current chunker, and the one that loses is removed. The PDF is still stored, for the viewer, citations and re-conversion. If it wins, milestone 8 adds a view and editor for each rulebook's Markdown (saving re-ingests it). Tests: the contract on scripted fake responses, the new chunker's rules, a live test.
+5b. **LLM parser:** `LLMProvider` (OpenAI and fake), LangSmith tracing from this first LLM call on, and `just test-live`. A parser sends each page image to a vision model, which writes it as Markdown following a fixed contract (verbatim text, real headings with levels, captions and box titles as bold text, informative text in pictures written out, no page numbers or hidden copies); our code adds a marker for each page. A chunker splits at the Markdown headings and never merges across a page. 5a's eval and an answer check (each question's top 5 chunks → the chat model → a judge against the golden answer) compare it with Docling and the current chunker, and the one that loses is removed. The PDF is still stored, for the viewer, citations and re-conversion. If it wins, milestone 8 adds a view and editor for each rulebook's Markdown (saving re-ingests it). Tests: the contract on scripted fake responses, the new chunker's rules, the answer check on scripted fake responses, a live test.
 
 6. **Chat graph:** add `web_search` to the `LLMProvider`; state, the graph with the Postgres checkpointer, router, recommendation nodes, the agent loop, both interrupts, `web_answer`, the chat API with SSE, the routing and answer evals, and `just chat`. Tests: graph tests, filter relaxation, SSE mapping, API interrupt and resume, separate conversation state, live tests.
 
