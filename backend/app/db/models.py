@@ -148,7 +148,7 @@ class Chunk(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    rulebook_id: Mapped[int]
+    rulebook_id: Mapped[int] = mapped_column(index=True)
     game_id: Mapped[int] = mapped_column(index=True)
     section_path: Mapped[str] = mapped_column(Text)
     chunk_type: Mapped[ChunkType] = mapped_column(text_enum(ChunkType))
