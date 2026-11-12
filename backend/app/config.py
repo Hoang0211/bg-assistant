@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     # Relative paths are resolved from the directory the app runs in (backend/).
     upload_dir: Path = Path("data/uploads")
 
+    # The eval's own database, on the same server as database_url; just eval-ingest builds it.
+    eval_database_name: str = "bg_assistant_eval"
+
+    # The eval's questions and library, and the rulebook PDFs it's built from.
+    eval_dir: Path = Path("eval")
+    eval_rulebooks_dir: Path = Path("data/rulebooks")
+
     # Largest rulebook PDF accepted, in MB.
     max_upload_mb: int = 50
 

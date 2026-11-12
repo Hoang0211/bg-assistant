@@ -1,5 +1,7 @@
 import asyncio
 import hashlib
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -123,3 +125,16 @@ async def test_reindex_skips_a_rulebook_deleted_while_it_is_ingested(
 def test_parser_reads_the_game_option() -> None:
     assert _parser().parse_args(["reindex", "--game", "3"]).game == 3
     assert _parser().parse_args(["reindex"]).game is None
+
+
+def test_parser_reads_the_eval_ingest_command() -> None:
+    assert _parser().parse_args(["eval-ingest"]).command == "eval-ingest"
+
+
+def test_cli_runs_as_a_module() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "app.cli", "--help"], capture_output=True, text=True
+    )
+
+    assert result.returncode == 0
+    assert "eval-ingest" in result.stdout
