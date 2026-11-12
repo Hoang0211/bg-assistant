@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
 
-from sqlalchemy import delete, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -65,11 +65,20 @@ async def ingest_rulebook(
         chunks, vectors, report = await asyncio.to_thread(
             _process, upload_dir / rulebook.storage_path, rulebook.page_count, parse, embedder
         )
+        # Lock the rulebook until the commit, so a move waits and another ingestion of it can't
+        # write its chunks at the same time; and read its game now, not from before the parse.
+        game_id = await session.scalar(
+            select(Rulebook.game_id).where(Rulebook.id == rulebook_id).with_for_update()
+        )
+        if game_id is None:
+            logger.info("rulebook %d was deleted while it was ingested", rulebook_id)
+            return
+
         await session.execute(delete(Chunk).where(Chunk.rulebook_id == rulebook_id))
         session.add_all(
             Chunk(
                 rulebook_id=rulebook_id,
-                game_id=rulebook.game_id,
+                game_id=game_id,
                 section_path=chunk.section_path,
                 chunk_type=chunk.chunk_type,
                 page_start=chunk.page_start,

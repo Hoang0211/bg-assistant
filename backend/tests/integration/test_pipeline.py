@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pymupdf
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Chunk, ChunkType, Game, Rulebook, RulebookStatus
@@ -94,6 +94,26 @@ async def test_ingest_rulebook_replaces_the_old_chunks(
 
     contents = (await db_session.scalars(select(Chunk.content))).all()
     assert contents == ["Setup\n\nEach player takes five cards."]
+
+
+async def test_ingest_rulebook_gives_the_chunks_the_rulebooks_current_game(
+    db_session: AsyncSession, tmp_path: Path
+) -> None:
+    rulebook = await _add_rulebook(db_session, tmp_path)
+    other_game = Game(name="Other game")
+    db_session.add(other_game)
+    await db_session.flush()
+    # Moved behind the session's back, like a PATCH during the parse: the loaded rulebook
+    # still has its old game.
+    await db_session.execute(
+        update(Rulebook).where(Rulebook.id == rulebook.id).values(game_id=other_game.id),
+        execution_options={"synchronize_session": False},
+    )
+
+    await ingest_rulebook(db_session, rulebook.id, tmp_path, lambda path: ELEMENTS, FakeEmbedder())
+
+    assert await db_session.scalar(select(Rulebook.status)) == RulebookStatus.READY
+    assert list(await db_session.scalars(select(Chunk.game_id))) == [other_game.id]
 
 
 async def test_ingest_rulebook_saves_the_error_when_parsing_fails(
