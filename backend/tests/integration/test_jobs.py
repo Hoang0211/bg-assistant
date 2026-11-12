@@ -106,5 +106,8 @@ async def test_worker_keeps_running_after_a_job_fails(
     worker.enqueue(second.id)
     await _run_until_idle(worker)
 
-    statuses = (await db_session.scalars(select(Rulebook.status).order_by(Rulebook.id))).all()
-    assert statuses == [RulebookStatus.UPLOADED, RulebookStatus.READY]
+    rows = await db_session.execute(select(Rulebook.status, Rulebook.error).order_by(Rulebook.id))
+    assert rows.all() == [
+        (RulebookStatus.FAILED, "model files not found"),
+        (RulebookStatus.READY, None),
+    ]

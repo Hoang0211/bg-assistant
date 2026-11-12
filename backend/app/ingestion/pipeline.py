@@ -37,6 +37,15 @@ def _process(
     return chunks, vectors, report
 
 
+async def mark_failed(session: AsyncSession, rulebook_id: int, error: Exception) -> None:
+    await session.execute(
+        update(Rulebook)
+        .where(Rulebook.id == rulebook_id)
+        .values(status=RulebookStatus.FAILED, error=str(error))
+    )
+    await session.commit()
+
+
 async def ingest_rulebook(
     session: AsyncSession,
     rulebook_id: int,
@@ -102,9 +111,4 @@ async def ingest_rulebook(
         # After a rollback the loaded rulebook is expired, and reading it would need a lazy
         # load, so the failure is saved with an UPDATE instead.
         await session.rollback()
-        await session.execute(
-            update(Rulebook)
-            .where(Rulebook.id == rulebook_id)
-            .values(status=RulebookStatus.FAILED, error=str(error))
-        )
-        await session.commit()
+        await mark_failed(session, rulebook_id, error)

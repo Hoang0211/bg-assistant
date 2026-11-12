@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db.models import Rulebook, RulebookStatus
 from app.ingestion.elements import Element
 from app.ingestion.embedder import Embedder
-from app.ingestion.pipeline import ingest_rulebook
+from app.ingestion.pipeline import ingest_rulebook, mark_failed
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +62,14 @@ class IngestionWorker:
         await self._queue.join()
 
     async def _ingest(self, rulebook_id: int) -> None:
-        if self._embedder is None:
-            logger.info("loading the embedding model")
-            self._embedder = await asyncio.to_thread(self._make_embedder)
         async with self._sessionmaker() as session:
+            if self._embedder is None:
+                logger.info("loading the embedding model")
+                try:
+                    self._embedder = await asyncio.to_thread(self._make_embedder)
+                except Exception as error:
+                    await mark_failed(session, rulebook_id, error)
+                    raise
             await ingest_rulebook(
                 session, rulebook_id, self._upload_dir, self._parse, self._embedder
             )
