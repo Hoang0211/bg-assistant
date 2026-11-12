@@ -35,17 +35,23 @@ async def reindex(
         ids = (await session.scalars(query)).all()
 
     failed = 0
+    skipped = 0
     for rulebook_id in ids:
         async with sessionmaker() as session:
             await ingest_rulebook(session, rulebook_id, upload_dir, parse, embedder)
             # A fresh query: after a failure the loaded rulebook is expired and can't lazy-load.
-            filename, status, error, report = (
+            row = (
                 await session.execute(
                     select(
                         Rulebook.filename, Rulebook.status, Rulebook.error, Rulebook.parse_report
                     ).where(Rulebook.id == rulebook_id)
                 )
-            ).one()
+            ).one_or_none()
+        if row is None:
+            print(f"rulebook {rulebook_id}: deleted, skipped")
+            skipped += 1
+            continue
+        filename, status, error, report = row
         if status == RulebookStatus.READY:
             assert report is not None
             print(f"rulebook {rulebook_id} ({filename}): ready, {report['chunk_count']} chunks")
@@ -53,7 +59,7 @@ async def reindex(
             failed += 1
             print(f"rulebook {rulebook_id} ({filename}): failed: {error}")
 
-    print(f"reindexed {len(ids)} rulebooks, {failed} failed")
+    print(f"reindexed {len(ids) - skipped} rulebooks, {failed} failed")
     return failed
 
 

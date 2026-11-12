@@ -1,8 +1,9 @@
+import asyncio
 import hashlib
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.cli import _parser, reindex
@@ -88,6 +89,34 @@ async def test_reindex_prints_why_a_rulebook_failed(
     assert capsys.readouterr().out.splitlines() == [
         f"rulebook {rulebook.id} (catan.pdf): failed: parsing failed 3 times",
         "reindexed 1 rulebooks, 1 failed",
+    ]
+
+
+async def test_reindex_skips_a_rulebook_deleted_while_it_is_ingested(
+    db_session: AsyncSession,
+    sessionmaker: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    rulebook = await _add_rulebook(db_session, tmp_path, "Catan", "catan.pdf", RulebookStatus.READY)
+    loop = asyncio.get_running_loop()
+
+    async def delete_rulebook() -> None:
+        async with sessionmaker() as session:
+            await session.execute(delete(Rulebook).where(Rulebook.id == rulebook.id))
+            await session.commit()
+
+    def parse(path: Path) -> list[Element]:
+        # The parse runs in a worker thread, so the delete is sent to the event loop to run.
+        asyncio.run_coroutine_threadsafe(delete_rulebook(), loop).result()
+        return ELEMENTS
+
+    failed = await reindex(sessionmaker, tmp_path, parse, FakeEmbedder())
+
+    assert failed == 0
+    assert capsys.readouterr().out.splitlines() == [
+        f"rulebook {rulebook.id}: deleted, skipped",
+        "reindexed 0 rulebooks, 0 failed",
     ]
 
 
