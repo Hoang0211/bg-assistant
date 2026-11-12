@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import cast
+
 import pymupdf
 from pymupdf import FileDataError
 
@@ -17,3 +20,12 @@ def read_page_count(data: bytes) -> int:
             return page_count
     except FileDataError as exc:
         raise InvalidPdfError("the file is not a readable PDF") from exc
+
+
+def low_text_pages(path: Path, min_chars: int) -> list[int]:
+    with pymupdf.open(path) as doc:  # type: ignore[no-untyped-call]
+        return [
+            number
+            for number, page in enumerate(doc.pages(), start=1)
+            if len(cast(str, page.get_text()).strip()) < min_chars
+        ]

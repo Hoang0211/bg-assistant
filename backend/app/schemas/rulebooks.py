@@ -6,6 +6,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.db.models import RulebookStatus
 
 
+class ParseReportRead(BaseModel):
+    """How well a rulebook parsed; the UI shows warnings for the listed pages."""
+
+    chunk_count: int
+    ocr_pages: list[int]
+    empty_pages: list[int]
+
+
 class RulebookRead(BaseModel):
     """A rulebook as returned by the API, with its game's current name."""
 
@@ -16,6 +24,7 @@ class RulebookRead(BaseModel):
     page_count: int
     status: RulebookStatus
     error: str | None
+    parse_report: ParseReportRead | None  # set once the rulebook is ready
     created_at: datetime
     updated_at: datetime
 

@@ -5,12 +5,17 @@ description = "Board game rules assistant: API and RAG engine"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.0",
+    "docling>=2.145.0",
     "fastapi>=0.156.2",
+    "pgvector>=0.5.1",
     "psycopg[binary]>=3.3.6",
     "pydantic-settings>=2.16.1",
     "pymupdf>=2.0",
     "python-multipart>=0.0.32",
+    "sentence-transformers>=6.2.0",
     "sqlalchemy[asyncio]>=2.1.5",
+    "torch>=2.15.0",
+    "torchvision>=0.29.2",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -26,6 +31,15 @@ dev = [
     "ruff>=0.17.1",
     "testcontainers[postgres]>=4.15.0",
 ]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+torchvision = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.ruff]
 line-length = 100
@@ -60,8 +74,10 @@ markers = [
 ]
 env = [
     "LLM_PROVIDER=fake",
+    "HF_HUB_OFFLINE=1",
     "D:OPENAI_API_KEY=",
     "LANGSMITH_TRACING=false",
+    "RUN_INGESTION_WORKER=false",
 ]
 
 [tool.coverage.run]

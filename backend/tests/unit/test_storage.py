@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.services.rulebooks import remove_files
+from app.storage import remove_files
 
 
 async def test_remove_files_skips_a_file_it_cannot_remove(tmp_path: Path) -> None:

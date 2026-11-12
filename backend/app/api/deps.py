@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.session import database_is_reachable
+from app.ingestion.jobs import IngestionWorker
 
 
 async def get_database_reachable(request: Request) -> bool:
@@ -29,3 +30,12 @@ def get_upload_dir() -> Path:
 
 
 UploadDirDep = Annotated[Path, Depends(get_upload_dir)]
+
+
+def get_ingestion_worker(request: Request) -> IngestionWorker:
+    """Dependency: the background worker that ingests uploaded rulebooks."""
+    worker: IngestionWorker = request.app.state.ingestion_worker
+    return worker
+
+
+IngestionWorkerDep = Annotated[IngestionWorker, Depends(get_ingestion_worker)]

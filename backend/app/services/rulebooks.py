@@ -1,7 +1,5 @@
 import asyncio
 import hashlib
-import logging
-from collections.abc import Iterable
 from pathlib import Path
 
 from sqlalchemy import select
@@ -12,8 +10,7 @@ from app.db.models import Game, Rulebook
 from app.errors import NotFoundError, RuleViolationError, TooLargeError
 from app.ingestion.pdf_info import read_page_count
 from app.schemas.rulebooks import RulebookUpdate
-
-logger = logging.getLogger(__name__)
+from app.storage import remove_files, write_file
 
 
 class RulebookTooLargeError(TooLargeError):
@@ -30,20 +27,6 @@ class InvalidMoveError(RuleViolationError):
 
 class DuplicateRulebookError(RuleViolationError):
     """Raised when the uploaded PDF is already stored as a rulebook."""
-
-
-def _write_file(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
-
-
-async def remove_files(upload_dir: Path, storage_paths: Iterable[str]) -> None:
-    """Delete stored PDFs; a missing file is skipped and one that can't be removed is logged."""
-    for name in storage_paths:
-        try:
-            await asyncio.to_thread((upload_dir / name).unlink, missing_ok=True)
-        except OSError:
-            logger.warning("could not remove %s", name, exc_info=True)
 
 
 async def add_rulebook(
@@ -80,7 +63,7 @@ async def add_rulebook(
     # the same name), but a row pointing at a missing file would break ingestion.
     storage_path = f"{sha256}.pdf"
     path = upload_dir / storage_path
-    await asyncio.to_thread(_write_file, path, data)
+    await asyncio.to_thread(write_file, path, data)
 
     rulebook = Rulebook(
         game_id=game.id,

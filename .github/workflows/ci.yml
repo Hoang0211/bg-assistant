@@ -35,6 +35,16 @@ jobs:
       - name: Install dependencies
         working-directory: backend
         run: uv sync --locked
+      - name: Restore the models
+        id: models
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/huggingface
+          key: models-${{ hashFiles('backend/uv.lock', 'backend/app/config.py') }}
+          restore-keys: models-
+      - name: Download the models
+        if: steps.models.outputs.cache-hit != 'true'
+        run: just download-models
       - name: Lint and type-check
         run: just lint-backend
       - name: Test

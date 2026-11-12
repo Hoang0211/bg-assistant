@@ -3,8 +3,12 @@ from typing import Any
 
 import pytest
 from httpx2 import AsyncClient, Response
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_ingestion_worker
 from app.config import get_settings
+from app.db.models import Rulebook
+from app.main import app
 from tests.helpers import make_pdf, post_game
 
 
@@ -26,6 +30,16 @@ async def add_rulebook(
     return body
 
 
+class RecordingWorker:
+    """Stands in for the ingestion worker and records the ids it's given."""
+
+    def __init__(self) -> None:
+        self.queued: list[int] = []
+
+    def enqueue(self, rulebook_id: int) -> None:
+        self.queued.append(rulebook_id)
+
+
 async def test_list_game_rulebooks_returns_only_that_games_rulebooks(
     api_client: AsyncClient,
 ) -> None:
@@ -39,6 +53,26 @@ async def test_list_game_rulebooks_returns_only_that_games_rulebooks(
 
     assert response.status_code == 200
     assert response.json() == [rulebook_2, rulebook_3]
+
+
+async def test_list_game_rulebooks_returns_the_parse_report(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    game = await post_game(api_client)
+    rulebook = await add_rulebook(api_client, game["id"], make_pdf(1))
+    stored = await db_session.get(Rulebook, rulebook["id"])
+    assert stored is not None
+    stored.parse_report = {"chunk_count": 3, "ocr_pages": [1], "empty_pages": []}
+    await db_session.flush()
+
+    response = await api_client.get(f"/api/games/{game['id']}/rulebooks")
+
+    assert response.status_code == 200
+    assert response.json()[0]["parse_report"] == {
+        "chunk_count": 3,
+        "ocr_pages": [1],
+        "empty_pages": [],
+    }
 
 
 async def test_list_game_rulebooks_returns_404_for_an_unknown_game(api_client: AsyncClient) -> None:
@@ -60,8 +94,19 @@ async def test_post_rulebook_returns_201_with_the_stored_rulebook(api_client: As
     assert body["filename"] == "rules.pdf"
     assert body["page_count"] == 3
     assert body["status"] == "uploaded"
+    assert body["parse_report"] is None
     assert "sha256" not in body
     assert "storage_path" not in body
+
+
+async def test_post_rulebook_queues_the_rulebook_for_ingestion(api_client: AsyncClient) -> None:
+    worker = RecordingWorker()
+    app.dependency_overrides[get_ingestion_worker] = lambda: worker
+    game = await post_game(api_client)
+
+    rulebook = await add_rulebook(api_client, game["id"], make_pdf(1))
+
+    assert worker.queued == [rulebook["id"]]
 
 
 async def test_post_rulebook_returns_404_for_an_unknown_game(api_client: AsyncClient) -> None:

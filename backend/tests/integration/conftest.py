@@ -4,7 +4,12 @@ from pathlib import Path
 import pytest
 from alembic.config import Config
 from httpx2 import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.pool import NullPool
 from testcontainers.community.postgres import PostgresContainer
 
@@ -46,6 +51,14 @@ async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
         finally:
             await session.close()
             await transaction.rollback()
+
+
+@pytest.fixture
+def sessionmaker(db_session: AsyncSession) -> async_sessionmaker[AsyncSession]:
+    """Sessions for code that opens its own; they join the test's transaction, so they roll back."""
+    return async_sessionmaker(
+        db_session.bind, join_transaction_mode="create_savepoint", expire_on_commit=False
+    )
 
 
 @pytest.fixture

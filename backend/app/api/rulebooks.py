@@ -1,9 +1,9 @@
 from fastapi import APIRouter, UploadFile, status
 from fastapi.responses import FileResponse
 
-from app.api.deps import SessionDep, UploadDirDep
+from app.api.deps import IngestionWorkerDep, SessionDep, UploadDirDep
 from app.db.models import Rulebook
-from app.schemas.rulebooks import RulebookRead, RulebookUpdate
+from app.schemas.rulebooks import ParseReportRead, RulebookRead, RulebookUpdate
 from app.services import games as games_service
 from app.services import rulebooks as rulebooks_service
 
@@ -19,6 +19,11 @@ def _to_read(rulebook: Rulebook, game_name: str) -> RulebookRead:
         page_count=rulebook.page_count,
         status=rulebook.status,
         error=rulebook.error,
+        parse_report=(
+            None
+            if rulebook.parse_report is None
+            else ParseReportRead.model_validate(rulebook.parse_report)
+        ),
         created_at=rulebook.created_at,
         updated_at=rulebook.updated_at,
     )
@@ -35,15 +40,20 @@ async def list_game_rulebooks(game_id: int, session: SessionDep) -> list[Ruleboo
 
 @router.post("/games/{game_id}/rulebooks", status_code=status.HTTP_201_CREATED)
 async def add_rulebook(
-    game_id: int, file: UploadFile, session: SessionDep, upload_dir: UploadDirDep
+    game_id: int,
+    file: UploadFile,
+    session: SessionDep,
+    upload_dir: UploadDirDep,
+    worker: IngestionWorkerDep,
 ) -> RulebookRead:
-    """Add a PDF as one of the game's rulebooks."""
+    """Add a PDF as one of the game's rulebooks and queue it for ingestion."""
     game = await games_service.get_game(session, game_id)
     data = await file.read()
 
     rulebook = await rulebooks_service.add_rulebook(
         session, game, file.filename or "rulebook.pdf", data, upload_dir
     )
+    worker.enqueue(rulebook.id)
 
     return _to_read(rulebook, game.name)
 
