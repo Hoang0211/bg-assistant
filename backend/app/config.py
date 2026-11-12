@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # Times the parse is tried in its own process before the rulebook is marked as failed.
     parse_attempts: int = 3
 
+    # A parse that runs longer than this is stopped and not tried again.
+    parse_timeout_seconds: int = 600
+
     # Off in tests, so starting the app there doesn't ingest rulebooks from the dev database.
     run_ingestion_worker: bool = True
 

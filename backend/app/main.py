@@ -32,7 +32,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     worker = IngestionWorker(
         app.state.sessionmaker,
         settings.upload_dir,
-        partial(parse_in_process, attempts=settings.parse_attempts),
+        partial(
+            parse_in_process,
+            attempts=settings.parse_attempts,
+            timeout_seconds=settings.parse_timeout_seconds,
+        ),
         partial(BgeEmbedder, settings.embedding_model),
     )
     app.state.ingestion_worker = worker

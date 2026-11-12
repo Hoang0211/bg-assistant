@@ -92,7 +92,11 @@ async def test_ingest_rulebook_chunks_each_layout_by_section(
         db_session,
         rulebook.id,
         tmp_path,
-        partial(parse_in_process, attempts=settings.parse_attempts),
+        partial(
+            parse_in_process,
+            attempts=settings.parse_attempts,
+            timeout_seconds=settings.parse_timeout_seconds,
+        ),
         embedder,
     )
 

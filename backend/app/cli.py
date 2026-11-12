@@ -80,7 +80,11 @@ async def _run(args: argparse.Namespace) -> int:
         failed = await reindex(
             create_sessionmaker(engine),
             settings.upload_dir,
-            partial(parse_in_process, attempts=settings.parse_attempts),
+            partial(
+                parse_in_process,
+                attempts=settings.parse_attempts,
+                timeout_seconds=settings.parse_timeout_seconds,
+            ),
             BgeEmbedder(settings.embedding_model),
             args.game,
         )

@@ -23,7 +23,7 @@ class ParseFailedError(Exception):
     """Raised when every parse attempt failed."""
 
 
-def parse_in_process(path: Path, attempts: int) -> list[Element]:
+def parse_in_process(path: Path, attempts: int, timeout_seconds: int) -> list[Element]:
     """Parse a PDF in a child process, trying again if the child fails or crashes."""
     with TemporaryDirectory() as folder:
         output = Path(folder) / "elements.json"
@@ -35,7 +35,12 @@ def parse_in_process(path: Path, attempts: int) -> list[Element]:
             str(output),
         ]
         for attempt in range(1, attempts + 1):
-            code = subprocess.run(command, cwd=_BACKEND_DIR).returncode
+            try:
+                code = subprocess.run(command, cwd=_BACKEND_DIR, timeout=timeout_seconds).returncode
+            except subprocess.TimeoutExpired:
+                # A parse this slow would most likely be as slow again, so it isn't retried.
+                raise ParseFailedError(f"parsing took longer than {timeout_seconds} s") from None
+
             if code == 0:
                 items = json.loads(output.read_text(encoding="utf-8"))
                 return [
