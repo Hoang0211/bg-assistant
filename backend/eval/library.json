@@ -1,0 +1,74 @@
+{
+  "about": "The games and rulebooks that just eval-ingest builds the eval database from. Each file lives in backend/data/rulebooks/, which isn't committed; sha256 identifies the exact edition the golden questions were written for. Expansions sit under their base game, matching the one-level rule.",
+  "games": [
+    {
+      "name": "Sea Salt & Paper",
+      "rulebooks": [
+        {
+          "file": "SSAP_EN.pdf",
+          "sha256": "f2feb5a37efd5a7d2b4126fd301a418337a7ec7b037bd217755789fdc9f2315f"
+        }
+      ],
+      "expansions": [
+        {
+          "name": "Extra Salt",
+          "rulebooks": [
+            {
+              "file": "SSAP_EXTRA_SALT_EN.pdf",
+              "sha256": "54545da444edcf25bc0cd0cb7b072fcd3ee2075bfff5bde8c33909d8486cdeeb"
+            }
+          ]
+        },
+        {
+          "name": "Extra Pepper",
+          "rulebooks": [
+            {
+              "file": "SSAP_EXTRA_PEPPER_EN.pdf",
+              "sha256": "c817b9cdf3761d79f4b8b4dab910a96dbe193590e57298b2cf33f61b0b3233f3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rebel Princess",
+      "rulebooks": [
+        {
+          "file": "Rebel_Princess_Deluxe_Edition_EN.pdf",
+          "sha256": "a7bedf787cc20a5f9c6e27c59d9db5daddd52dcec6ff46eb78a7c4a7c06325d2"
+        }
+      ],
+      "expansions": []
+    },
+    {
+      "name": "Splendor",
+      "rulebooks": [
+        {
+          "file": "Splendor_EN.pdf",
+          "sha256": "6e875b7d823ee4ffeb1110d07a14ec8e49814d879aed575177b5408d3e2ee407"
+        }
+      ],
+      "expansions": []
+    },
+    {
+      "name": "Catan",
+      "rulebooks": [
+        {
+          "file": "Catan_EN.pdf",
+          "sha256": "3fed941bf202314ed462d4d0cdfb0384c97fe04166b48a7186833b3f6f4ac024"
+        }
+      ],
+      "expansions": []
+    },
+    {
+      "name": "Power Grid",
+      "rulebooks": [
+        {
+          "file": "Power_Grid_EN.pdf",
+          "sha256": "bd141f7b8ed5ab170e654598e5db1839c9f809bce5b5eb61eccca07180c7d4e4"
+        }
+      ],
+      "expansions": []
+    }
+  ]
+}

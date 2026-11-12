@@ -225,8 +225,8 @@
           "pages": [2]
         }
       ],
-      "answer": "Remove 3 tokens of each gem colour (4 of each left), keep all the gold, and reveal 3 nobles.",
-      "tags": ["table"]
+      "answer": "Return 3 pieces of each gem colour to the box (4 of each left), keep all the gold, and reveal 3 Noble tiles.",
+      "tags": ["reworded"]
     },
     {
       "id": "splendor-02",
@@ -235,10 +235,10 @@
       "expected": [
         {
           "file": "Splendor_EN.pdf",
-          "pages": [3]
+          "pages": [2]
         }
       ],
-      "answer": "Only when at least 4 tokens of that colour are left before you take them.",
+      "answer": "Only when at least 4 pieces of that colour are in the supply before you take them.",
       "tags": []
     },
     {
@@ -248,11 +248,11 @@
       "expected": [
         {
           "file": "Splendor_EN.pdf",
-          "pages": [3]
+          "pages": [2]
         }
       ],
-      "answer": "10 at the end of your turn, gold included; return the extra ones (any of them, including ones just taken).",
-      "tags": []
+      "answer": "10 at the end of your turn; with more, return pieces of your choice to the supply until you have 10.",
+      "tags": ["reworded"]
     },
     {
       "id": "splendor-04",
@@ -261,11 +261,11 @@
       "expected": [
         {
           "file": "Splendor_EN.pdf",
-          "pages": [4]
+          "pages": [2]
         }
       ],
-      "answer": "It's refilled straight away with a card of the same level, so there are always 4 face-up cards per level unless that deck is empty.",
-      "tags": ["callout", "reworded"]
+      "answer": "It is refilled straight away from that level's deck, so there are always 4 face-up cards of each level unless that deck runs out.",
+      "tags": ["reworded"]
     },
     {
       "id": "splendor-05",
@@ -274,10 +274,10 @@
       "expected": [
         {
           "file": "Splendor_EN.pdf",
-          "pages": [4]
+          "pages": [2]
         }
       ],
-      "answer": "The one who bought fewer development cards.",
+      "answer": "The one who bought fewer development cards; if still tied, they share the victory.",
       "tags": []
     },
     {
