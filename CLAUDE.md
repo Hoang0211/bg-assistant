@@ -27,6 +27,7 @@ Run `just` to list everything. The main ones:
 - Database tests live in `backend/tests/integration/` and use the `db_session` fixture (or `api_client` for HTTP), whose changes are rolled back after each test. They need Docker running: testcontainers starts a throwaway pgvector container, never the dev database.
 - Services raise the error kinds in `backend/app/errors.py` (subclass `NotFoundError`, `RuleViolationError` or `TooLargeError`), never `HTTPException`, so the CLI can reuse them; `backend/app/api/error_handlers.py` maps each kind to one status code.
 - Routes in each `backend/app/api/` file, and their API tests, are grouped by URL in the order `/docs` shows them, and within a URL go GET, POST, PATCH, DELETE. Within each route's tests, success comes first, then errors by status code.
+- In each module, a private helper (`_name`) sits right above the first function that uses it; entry points (`main`, `_main`) go last.
 - Model names and tunables live in `backend/app/config.py`; `.env` holds only secrets and switches.
 - Prompts are append-only: static system prompt and tools first, history never trimmed or rewritten (for OpenAI prompt caching).
 - Chunk text is prefixed with its section path only, never the game name.

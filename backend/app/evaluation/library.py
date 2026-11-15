@@ -38,23 +38,6 @@ def read_library(path: Path) -> Library:
     return Library.model_validate_json(path.read_text(encoding="utf-8"))
 
 
-async def load_library(session: AsyncSession, library: Library, rulebooks_dir: Path) -> None:
-    """Replace every game in the database with the library's games and their rulebooks."""
-    # Deleting the games cascades to their rulebooks and chunks; the PDFs aren't touched.
-    await session.execute(delete(Game))
-    for entry in library.games:
-        game = Game(name=entry.name)
-        session.add(game)
-        await session.flush()
-        _add_rulebooks(session, game, entry.rulebooks, rulebooks_dir)
-        for expansion_entry in entry.expansions:
-            expansion = Game(name=expansion_entry.name, is_expansion=True, base_game_id=game.id)
-            session.add(expansion)
-            await session.flush()
-            _add_rulebooks(session, expansion, expansion_entry.rulebooks, rulebooks_dir)
-    await session.commit()
-
-
 def _add_rulebooks(
     session: AsyncSession, game: Game, rulebooks: list[LibraryRulebook], rulebooks_dir: Path
 ) -> None:
@@ -75,3 +58,20 @@ def _add_rulebooks(
                 sha256=sha256,
             )
         )
+
+
+async def load_library(session: AsyncSession, library: Library, rulebooks_dir: Path) -> None:
+    """Replace every game in the database with the library's games and their rulebooks."""
+    # Deleting the games cascades to their rulebooks and chunks; the PDFs aren't touched.
+    await session.execute(delete(Game))
+    for entry in library.games:
+        game = Game(name=entry.name)
+        session.add(game)
+        await session.flush()
+        _add_rulebooks(session, game, entry.rulebooks, rulebooks_dir)
+        for expansion_entry in entry.expansions:
+            expansion = Game(name=expansion_entry.name, is_expansion=True, base_game_id=game.id)
+            session.add(expansion)
+            await session.flush()
+            _add_rulebooks(session, expansion, expansion_entry.rulebooks, rulebooks_dir)
+    await session.commit()

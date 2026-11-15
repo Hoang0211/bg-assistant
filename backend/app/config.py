@@ -52,6 +52,13 @@ class Settings(BaseSettings):
     # vector size differs.
     embedding_model: str = "BAAI/bge-base-en-v1.5"
 
+    # Hybrid search: candidates kept from vector and from full-text search, Reciprocal Rank
+    # Fusion's k, and how many fused chunks go on to the reranker.
+    vector_candidates: int = 30
+    full_text_candidates: int = 30
+    rrf_k: int = 60
+    fused_candidates: int = 20
+
     # Lists frontend origins allowed to call API from browser
     cors_origins: list[str] = ["http://localhost:3000"]
 
