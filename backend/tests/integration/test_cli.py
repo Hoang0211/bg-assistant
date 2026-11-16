@@ -131,6 +131,10 @@ def test_parser_reads_the_eval_ingest_command() -> None:
     assert _parser().parse_args(["eval-ingest"]).command == "eval-ingest"
 
 
+def test_parser_reads_the_eval_command() -> None:
+    assert _parser().parse_args(["eval"]).command == "eval"
+
+
 def test_cli_runs_as_a_module() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "app.cli", "--help"], capture_output=True, text=True

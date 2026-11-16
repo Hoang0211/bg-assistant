@@ -31,8 +31,9 @@ def _place(place: Place, hit: bool) -> str:
 def format_report(
     results: list[QuestionResult], settings: Settings, chunk_count: int, now: datetime
 ) -> str:
-    """Scores for all questions and for each tag, then every question's top results."""
+    """Scores for all questions, each game and each tag, then every question's top results."""
     k = settings.search_results
+    games = list(dict.fromkeys(result.question.game for result in results))  # in question order
     tags = sorted({tag for result in results for tag in result.question.tags})
     lines = [
         f"# Retrieval eval: {now:%Y-%m-%d %H:%M}",
@@ -48,6 +49,7 @@ def format_report(
         f"| Questions | Count | Recall@{k} | MRR | nDCG@{k} |",
         "| --- | --: | --: | --: | --: |",
         _score_row("all", results),
+        *[_score_row(game, [r for r in results if r.question.game == game]) for game in games],
         *[_score_row(tag, [r for r in results if tag in r.question.tags]) for tag in tags],
         "",
         "## Questions",

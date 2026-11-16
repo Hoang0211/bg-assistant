@@ -46,7 +46,7 @@ bg-assistant/
 │  ├─ pyproject.toml, uv.lock, alembic/, Dockerfile
 │  ├─ app/
 │  │  ├─ main.py, config.py (pydantic-settings), export_openapi.py
-│  │  ├─ cli.py           reindex and chat commands for using the engine from a terminal
+│  │  ├─ cli.py           reindex, eval-ingest, eval and chat commands for using the engine from a terminal
 │  │  ├─ tracing.py       LangSmith setup: wrapped OpenAI client, run metadata helpers
 │  │  ├─ errors.py        error kinds the services raise (NotFoundError, RuleViolationError, TooLargeError), free of HTTP
 │  │  ├─ api/             health.py, games.py, rulebooks.py, chat.py, deps.py,
@@ -60,10 +60,12 @@ bg-assistant/
 │  │  │                   layout_parser.py (Docling → typed elements), chunker.py, embedder.py,
 │  │  │                   quality.py (parse report), pipeline.py, jobs.py
 │  │  ├─ retrieval/       hybrid.py (vector + full-text, RRF), reranker.py
+│  │  ├─ evaluation/      library.py, database.py (the eval database), questions.py, metrics.py,
+│  │  │                   retrieval.py (scores each question), report.py
 │  │  └─ chat/            state.py, graph.py, prompts.py, streaming.py (graph stream → SSE events)
 │  │                      nodes/ router.py, recommend.py, rules_agent.py, tools.py, clarify.py,
 │  │                             reply.py, web_answer.py
-│  ├─ eval/               golden_questions.json, library.json, run_eval.py, reports/
+│  ├─ eval/               golden_questions.json, library.json, reports/
 │  ├─ data/uploads/       uploaded rulebook PDFs (gitignored; mounted into the backend container)
 │  └─ tests/              unit/, integration/, fixtures/ (small sample PDFs)
 ├─ frontend/

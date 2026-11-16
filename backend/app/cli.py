@@ -1,20 +1,24 @@
-"""Engine commands for the terminal: python -m app.cli reindex [--game <id>] | eval-ingest."""
+"""Engine commands for the terminal: reindex [--game <id>], eval-ingest and eval."""
 
 import argparse
 import asyncio
 import sys
 from collections.abc import Callable, Sequence
+from datetime import datetime
 from functools import partial
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings, get_settings
-from app.db.models import Rulebook, RulebookStatus
+from app.db.models import Chunk, Rulebook, RulebookStatus
 from app.db.session import create_db_engine, create_sessionmaker
 from app.evaluation.database import create_database_if_missing, eval_database_url, migrate
 from app.evaluation.library import load_library, read_library
+from app.evaluation.questions import read_questions
+from app.evaluation.report import format_report
+from app.evaluation.retrieval import evaluate_question
 from app.ingestion.elements import Element
 from app.ingestion.embedder import BgeEmbedder, Embedder
 from app.ingestion.parse_process import parse_in_process
@@ -75,6 +79,7 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser(
         "eval-ingest", help="build the eval database from the eval library and ingest it"
     )
+    commands.add_parser("eval", help="search the eval database for each golden question")
     return parser
 
 
@@ -120,6 +125,28 @@ async def _eval_ingest(settings: Settings) -> int:
     return 1 if failed else 0
 
 
+async def _eval(settings: Settings) -> int:
+    """Score each golden question's search results and write the report."""
+    questions = read_questions(settings.eval_dir / "golden_questions.json")
+    embedder = BgeEmbedder(settings.embedding_model)
+    engine = create_db_engine(settings)
+    try:
+        async with create_sessionmaker(engine)() as session:
+            results = [
+                await evaluate_question(session, embedder, question, settings.search_results)
+                for question in questions
+            ]
+            chunk_count = await session.scalar(select(func.count()).select_from(Chunk))
+    finally:
+        await engine.dispose()
+    now = datetime.now()
+    path = settings.eval_dir / "reports" / f"{now:%Y-%m-%d-%H%M}-retrieval.md"
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(format_report(results, settings, chunk_count or 0, now), encoding="utf-8")
+    print(f"wrote {path}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     configure_logging()
     args = _parser().parse_args(argv)
@@ -133,6 +160,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         migrate(url)
         eval_settings = settings.model_copy(update={"database_url": url})
         return asyncio.run(_eval_ingest(eval_settings), loop_factory=loop_factory)
+
+    if args.command == "eval":
+        url = eval_database_url(settings.database_url, settings.eval_database_name)
+        eval_settings = settings.model_copy(update={"database_url": url})
+        return asyncio.run(_eval(eval_settings), loop_factory=loop_factory)
+
     return asyncio.run(_reindex(settings, args.game), loop_factory=loop_factory)
 
 

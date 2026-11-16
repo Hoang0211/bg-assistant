@@ -113,3 +113,8 @@ reindex *args:
 [working-directory: 'backend']
 eval-ingest:
     uv run python -m app.cli eval-ingest
+
+# Search the eval database for each golden question and write a report to backend/eval/reports/.
+[working-directory: 'backend']
+eval:
+    uv run python -m app.cli eval

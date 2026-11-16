@@ -7,9 +7,9 @@ from app.evaluation.report import format_report
 from app.evaluation.retrieval import QuestionResult
 
 
-def _question(question_id: str, tags: list[str]) -> GoldenQuestion:
+def _question(question_id: str, game: str, tags: list[str]) -> GoldenQuestion:
     return GoldenQuestion(
-        id=question_id, game="Base", question="?", expected=[], answer="", tags=tags
+        id=question_id, game=game, question="?", expected=[], answer="", tags=tags
     )
 
 
@@ -24,7 +24,7 @@ def test_format_report_shows_the_scores_and_each_questions_top_results() -> None
     )
     results = [
         QuestionResult(
-            question=_question("q-1", ["table"]),
+            question=_question("q-1", "Base", ["table"]),
             places=[Place("a.pdf", 1, 1), Place("a.pdf", 2, 3)],
             hits=[False, True],
             recall=1.0,
@@ -32,7 +32,7 @@ def test_format_report_shows_the_scores_and_each_questions_top_results() -> None
             ndcg=0.6,
         ),
         QuestionResult(
-            question=_question("q-2", []),
+            question=_question("q-2", "Expansion", []),
             places=[Place("b.pdf", 4, 4)],
             hits=[False],
             recall=0.0,
@@ -55,6 +55,8 @@ def test_format_report_shows_the_scores_and_each_questions_top_results() -> None
         "| Questions | Count | Recall@2 | MRR | nDCG@2 |\n"
         "| --- | --: | --: | --: | --: |\n"
         "| all | 2 | 0.50 | 0.25 | 0.30 |\n"
+        "| Base | 1 | 1.00 | 0.50 | 0.60 |\n"
+        "| Expansion | 1 | 0.00 | 0.00 | 0.00 |\n"
         "| table | 1 | 1.00 | 0.50 | 0.60 |\n"
         "\n"
         "## Questions\n"
