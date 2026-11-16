@@ -8,6 +8,7 @@ from app.evaluation.metrics import Place
 from app.evaluation.questions import ExpectedPlace, GoldenQuestion
 from app.evaluation.retrieval import QuestionResult, evaluate_question, family_game_ids
 from app.ingestion.embedder import FakeEmbedder
+from app.retrieval.reranker import FakeReranker
 
 
 async def _add_game(db_session: AsyncSession, name: str, **fields: Any) -> tuple[Game, Rulebook]:
@@ -78,12 +79,13 @@ async def test_evaluate_question_scores_the_top_k_results(db_session: AsyncSessi
     )
     query = embedder.embed_query(question.question)
     _, rulebook = await _add_game(db_session, "Base")
-    # Ranked by distance to the query: the miss first, then one hit, then the other.
+    # Ranked by distance to the query: the miss first, then one hit, then the other. The fake
+    # reranker scores them all 0, since "Setup." has none of the question's words, so they stay.
     await _add_chunk(db_session, rulebook, (5, 5), query)
     await _add_chunk(db_session, rulebook, (2, 3), [1.0, *[0.0] * (EMBEDDING_DIMENSION - 1)])
     await _add_chunk(db_session, rulebook, (1, 2), [-value for value in query])
 
-    result = await evaluate_question(db_session, embedder, question, k=2)
+    result = await evaluate_question(db_session, embedder, FakeReranker(), question, k=2)
 
     hit_at_2 = 1 / math.log2(3)
     assert result == QuestionResult(

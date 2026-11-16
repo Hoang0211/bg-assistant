@@ -24,6 +24,7 @@ from app.ingestion.embedder import BgeEmbedder, Embedder
 from app.ingestion.parse_process import parse_in_process
 from app.ingestion.pipeline import ingest_rulebook
 from app.log_setup import configure_logging
+from app.retrieval.reranker import BgeReranker
 
 
 async def reindex(
@@ -129,11 +130,14 @@ async def _eval(settings: Settings) -> int:
     """Score each golden question's search results and write the report."""
     questions = read_questions(settings.eval_dir / "golden_questions.json")
     embedder = BgeEmbedder(settings.embedding_model)
+    reranker = BgeReranker(settings.reranker_model)
     engine = create_db_engine(settings)
     try:
         async with create_sessionmaker(engine)() as session:
             results = [
-                await evaluate_question(session, embedder, question, settings.search_results)
+                await evaluate_question(
+                    session, embedder, reranker, question, settings.search_results
+                )
                 for question in questions
             ]
             chunk_count = await session.scalar(select(func.count()).select_from(Chunk))

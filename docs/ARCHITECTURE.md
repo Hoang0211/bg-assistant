@@ -59,7 +59,8 @@ bg-assistant/
 │  │  ├─ ingestion/       pdf_info.py (PyMuPDF: readable check, page count),
 │  │  │                   layout_parser.py (Docling → typed elements), chunker.py, embedder.py,
 │  │  │                   quality.py (parse report), pipeline.py, jobs.py
-│  │  ├─ retrieval/       hybrid.py (vector + full-text, RRF), reranker.py
+│  │  ├─ retrieval/       hybrid.py (vector + full-text, RRF), reranker.py,
+│  │  │                   search.py (hybrid candidates reranked: the search chat and the eval use)
 │  │  ├─ evaluation/      library.py, database.py (the eval database), questions.py, metrics.py,
 │  │  │                   retrieval.py (scores each question), report.py
 │  │  └─ chat/            state.py, graph.py, prompts.py, streaming.py (graph stream → SSE events)
@@ -227,7 +228,7 @@ Tests are written with each feature, not at the end. A milestone is done only wh
 - **Integration tests:** a testcontainers pgvector database, with a test that the migrations match the models (`alembic check`); the API through httpx `AsyncClient` (including message → interrupt → resume with the Postgres checkpointer; rulebook uploads, where every rejection leaves no row and no file; moving and deleting rulebooks; range requests on the file; reindex transactions); ingestion and retrieval on small fixture PDFs with different layouts (single column, two columns with an Example box, a scanned page); the ingestion worker run directly against the test database, while the app's own worker is off in tests (`RUN_INGESTION_WORKER=false`), so starting the app never ingests the dev database's rulebooks.
 - **Guard against real LLM calls:** pytest's environment forces `LLM_PROVIDER=fake`, clears `OPENAI_API_KEY` and turns LangSmith off; `pytest-socket` blocks all network access except localhost. A test that reaches for OpenAI fails instead of spending credit.
 - **Live tests:** a few tests marked `live`, one per real call type, check that OpenAI accepts the strict schemas and tool definitions. They're skipped by default and run with `just test-live`.
-- **Real models only where needed:** unit tests use a `FakeEmbedder` and no reranker; only the ingestion and retrieval integration tests load the BGE models and Docling. A guard test checks that importing the app loads neither Docling nor PyTorch.
+- **Real models only where needed:** other tests use a `FakeEmbedder` and a `FakeReranker`; only the embedder, reranker and ingestion integration tests load the BGE models and Docling. A guard test checks that importing the app loads neither Docling nor PyTorch.
 
 **Frontend**
 - Vitest + React Testing Library + MSW for components and the API client.

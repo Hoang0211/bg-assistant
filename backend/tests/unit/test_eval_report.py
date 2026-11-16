@@ -20,6 +20,7 @@ def test_format_report_shows_the_scores_and_each_questions_top_results() -> None
         full_text_candidates=30,
         rrf_k=60,
         fused_candidates=20,
+        reranker_model="reranker",
         search_results=2,
     )
     results = [
@@ -46,8 +47,10 @@ def test_format_report_shows_the_scores_and_each_questions_top_results() -> None
     assert report == (
         "# Retrieval eval: 2026-11-15 09:05\n"
         "\n"
-        "- Search: hybrid (vector 30, full text 30, RRF k = 60, fused 20); the top 2 are scored\n"
+        "- Search: hybrid (vector 30, full text 30, RRF k = 60, fused 20), then reranked;"
+        " the top 2 are scored\n"
         "- Embedding model: bge\n"
+        "- Reranker model: reranker\n"
         "- Chunks in the eval database: 12\n"
         "- A hit is a chunk from an expected rulebook covering an expected page, even if it's"
         " about something else, so a rulebook printed on one page makes all its chunks hits.\n"

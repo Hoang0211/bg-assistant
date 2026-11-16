@@ -40,8 +40,9 @@ def format_report(
         "",
         f"- Search: hybrid (vector {settings.vector_candidates}, full text "
         f"{settings.full_text_candidates}, RRF k = {settings.rrf_k}, fused "
-        f"{settings.fused_candidates}); the top {k} are scored",
+        f"{settings.fused_candidates}), then reranked; the top {k} are scored",
         f"- Embedding model: {settings.embedding_model}",
+        f"- Reranker model: {settings.reranker_model}",
         f"- Chunks in the eval database: {chunk_count}",
         "- A hit is a chunk from an expected rulebook covering an expected page, even if it's"
         " about something else, so a rulebook printed on one page makes all its chunks hits.",

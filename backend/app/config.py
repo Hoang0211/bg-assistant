@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     rrf_k: int = 60
     fused_candidates: int = 20
 
+    # Cross-encoder from Hugging Face that reranks the fused chunks.
+    reranker_model: str = "BAAI/bge-reranker-base"
+
     # Chunks a search returns: the ones sent to the LLM, and the ones the eval scores.
     search_results: int = 5
 
