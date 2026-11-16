@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     rrf_k: int = 60
     fused_candidates: int = 20
 
+    # Chunks a search returns: the ones sent to the LLM, and the ones the eval scores.
+    search_results: int = 5
+
     # Lists frontend origins allowed to call API from browser
     cors_origins: list[str] = ["http://localhost:3000"]
 
