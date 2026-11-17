@@ -31,9 +31,9 @@ async def vector_search(
     ids = await session.scalars(
         select(Chunk.id)
         .where(Chunk.game_id.in_(game_ids))
-        # Chunk.id breaks ties and keeps the search exact: the HNSW index can order by distance
-        # alone, so using it would apply the game filter after its nearest neighbours and could
-        # leave too few.
+        # Chunk.id breaks ties and keeps the search exact: the HNSW index can only order by
+        # distance alone, so it can't serve this ORDER BY. If it did, it would apply the game
+        # filter after its nearest neighbours and could leave too few.
         .order_by(Chunk.embedding.cosine_distance(query_vector), Chunk.id)
         .limit(limit)
     )

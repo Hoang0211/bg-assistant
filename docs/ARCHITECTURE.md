@@ -191,7 +191,7 @@ The `rules_agent` node calls `chat_model` with four tools. Conditional edges sen
 
 - **`find_games(query)`:** pg_trgm fuzzy matching; returns candidate base games and their expansions, and whether each has a ready rulebook.
 - **`search_rules(game_id, expansion_ids[], query)`:** hybrid retrieval scoped to the selected game and expansions:
-  1. vector search: top 30 by cosine similarity (with the BGE query prefix, HNSW index)
+  1. vector search: top 30 by cosine similarity (with the BGE query prefix), exact within the chosen games: sorting ties by chunk id keeps Postgres off the HNSW index, which would apply the game filter after its nearest neighbours and could return too few
   2. keyword search: top 30 by Postgres full-text rank among chunks with any of the question's words (`websearch_to_tsquery` with `or` between the words, ranked by `ts_rank`); requiring every word matched chunks for only 5 of the 30 golden questions
   3. Reciprocal Rank Fusion (k = 60), keep the top 20
   4. rerank with `bge-reranker-base` (only if 5b's eval shows it beats hybrid search), send the top 5 to the LLM, each shown as `[<Game name> (base game | expansion) › <section path>, p. X–Y]` followed by its text; the name comes from a join, so it's always current

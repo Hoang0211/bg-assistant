@@ -76,8 +76,10 @@ async def test_vector_search_finds_a_games_chunks_behind_many_closer_ones(
     game, rulebook = await _add_game(db_session, "Catan")
     _, other_rulebook = await _add_game(db_session, "Azul")
     far = [await _add_chunk(db_session, rulebook, "Catan", _vector(0, 1)) for _ in range(3)]
-    for _ in range(50):
-        await _add_chunk(db_session, other_rulebook, "Azul", _vector(1, 0))
+    # Distinct vectors: the index keeps rows with an identical vector in one element, so 50 copies
+    # of one vector would fill too few of its places to push Catan's chunks out.
+    for i in range(50):
+        await _add_chunk(db_session, other_rulebook, "Azul", _vector(1, 0, i / 1000))
     # Rule out every plan but the HNSW index, which would keep only its 40 nearest neighbours,
     # all of them Azul's, and then drop them as another game's.
     for setting in ("enable_seqscan", "enable_bitmapscan", "enable_sort"):
