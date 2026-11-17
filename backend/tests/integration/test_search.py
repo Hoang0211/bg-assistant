@@ -5,6 +5,8 @@ from app.ingestion.embedder import FakeEmbedder
 from app.retrieval.reranker import FakeReranker
 from app.retrieval.search import search
 
+QUERY = "Who goes first in a trade?"
+
 
 async def _add_rulebook(db_session: AsyncSession) -> Rulebook:
     game = Game(name="Catan")
@@ -40,25 +42,33 @@ async def _add_chunk(
     return chunk
 
 
+async def _add_candidates(db_session: AsyncSession, embedder: FakeEmbedder) -> Rulebook:
+    """Three chunks that hybrid search and the fake reranker put in different orders."""
+    query_vector = embedder.embed_query(QUERY)
+    rulebook = await _add_rulebook(db_session)
+    # Hybrid search ranks these by distance to the query, since full-text search drops the stop
+    # words they share with it ("who", "in", "a"); the fake reranker counts those words too.
+    await _add_chunk(db_session, rulebook, "Setup.", query_vector)
+    await _add_chunk(
+        db_session, rulebook, "Who plays in a team?", [1.0, *[0.0] * (EMBEDDING_DIMENSION - 1)]
+    )
+    await _add_chunk(db_session, rulebook, "It is a game.", [-value for value in query_vector])
+    return rulebook
+
+
 async def test_search_returns_the_best_scored_candidates_first(db_session: AsyncSession) -> None:
     embedder = FakeEmbedder()
-    query = "Who goes first in a trade?"
-    query_vector = embedder.embed_query(query)
-    rulebook = await _add_rulebook(db_session)
-    # Hybrid search ranks these by distance to the query (none has every word, so full text
-    # finds none); the fake reranker by how many of the query's words they contain.
-    await _add_chunk(db_session, rulebook, "Setup.", query_vector)
-    first = await _add_chunk(
-        db_session,
-        rulebook,
-        "The youngest player goes first.",
-        [1.0, *[0.0] * (EMBEDDING_DIMENSION - 1)],
-    )
-    trade = await _add_chunk(
-        db_session, rulebook, "Trade cards.", [-value for value in query_vector]
-    )
+    rulebook = await _add_candidates(db_session, embedder)
 
-    results = await search(db_session, embedder, FakeReranker(), query, [rulebook.game_id], limit=2)
+    results = await search(db_session, embedder, FakeReranker(), QUERY, [rulebook.game_id], limit=2)
 
-    # Without reranking, the top 2 would be setup and first.
-    assert [result.chunk_id for result in results] == [first.id, trade.id]
+    assert [result.content for result in results] == ["Who plays in a team?", "It is a game."]
+
+
+async def test_search_without_a_reranker_keeps_the_hybrid_order(db_session: AsyncSession) -> None:
+    embedder = FakeEmbedder()
+    rulebook = await _add_candidates(db_session, embedder)
+
+    results = await search(db_session, embedder, None, QUERY, [rulebook.game_id], limit=2)
+
+    assert [result.content for result in results] == ["Setup.", "Who plays in a team?"]

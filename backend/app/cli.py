@@ -127,14 +127,18 @@ async def _eval_ingest(settings: Settings) -> int:
 
 
 async def _eval(settings: Settings) -> int:
-    """Score each golden question's search results and write the report."""
+    """Score each golden question's search results, without and with reranking; write the report."""
     questions = read_questions(settings.eval_dir / "golden_questions.json")
     embedder = BgeEmbedder(settings.embedding_model)
     reranker = BgeReranker(settings.reranker_model)
     engine = create_db_engine(settings)
     try:
         async with create_sessionmaker(engine)() as session:
-            results = [
+            hybrid = [
+                await evaluate_question(session, embedder, None, question, settings.search_results)
+                for question in questions
+            ]
+            reranked = [
                 await evaluate_question(
                     session, embedder, reranker, question, settings.search_results
                 )
@@ -146,7 +150,8 @@ async def _eval(settings: Settings) -> int:
     now = datetime.now()
     path = settings.eval_dir / "reports" / f"{now:%Y-%m-%d-%H%M}-retrieval.md"
     path.parent.mkdir(exist_ok=True)
-    path.write_text(format_report(results, settings, chunk_count or 0, now), encoding="utf-8")
+    report = format_report(hybrid, reranked, settings, chunk_count or 0, now)
+    path.write_text(report, encoding="utf-8")
     print(f"wrote {path}")
     return 0
 

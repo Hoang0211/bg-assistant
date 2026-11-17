@@ -49,7 +49,7 @@ async def _places(session: AsyncSession, game_ids: list[int]) -> dict[int, Place
 async def evaluate_question(
     session: AsyncSession,
     embedder: Embedder,
-    reranker: Reranker,
+    reranker: Reranker | None,
     question: GoldenQuestion,
     k: int,
 ) -> QuestionResult:

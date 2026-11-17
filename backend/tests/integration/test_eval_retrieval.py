@@ -10,6 +10,18 @@ from app.evaluation.retrieval import QuestionResult, evaluate_question, family_g
 from app.ingestion.embedder import FakeEmbedder
 from app.retrieval.reranker import FakeReranker
 
+QUESTION = GoldenQuestion(
+    id="q-1",
+    game="Base",
+    question="Who goes first?",
+    expected=[ExpectedPlace(file="Base.pdf", pages=[2])],
+    answer="The youngest player.",
+    tags=[],
+)
+
+# nDCG's weight for a hit at rank 2.
+HIT_AT_2 = 1 / math.log2(3)
+
 
 async def _add_game(db_session: AsyncSession, name: str, **fields: Any) -> tuple[Game, Rulebook]:
     game = Game(name=name, **fields)
@@ -28,7 +40,11 @@ async def _add_game(db_session: AsyncSession, name: str, **fields: Any) -> tuple
 
 
 async def _add_chunk(
-    db_session: AsyncSession, rulebook: Rulebook, pages: tuple[int, int], embedding: list[float]
+    db_session: AsyncSession,
+    rulebook: Rulebook,
+    pages: tuple[int, int],
+    content: str,
+    embedding: list[float],
 ) -> None:
     db_session.add(
         Chunk(
@@ -38,11 +54,24 @@ async def _add_chunk(
             chunk_type=ChunkType.SECTION,
             page_start=pages[0],
             page_end=pages[1],
-            content="Setup.",
+            content=content,
             embedding=embedding,
         )
     )
     await db_session.flush()
+
+
+async def _add_ranked_chunks(db_session: AsyncSession, embedder: FakeEmbedder) -> None:
+    """A miss and two hits that hybrid search and the fake reranker order differently."""
+    query = embedder.embed_query(QUESTION.question)
+    _, rulebook = await _add_game(db_session, "Base")
+    # Hybrid search ranks them by distance to the query: the miss, then one hit, then the other.
+    # Full-text search drops "Who is it?" as all stop words; the fake reranker counts "who".
+    await _add_chunk(db_session, rulebook, (5, 5), "Setup.", query)
+    await _add_chunk(
+        db_session, rulebook, (2, 3), "Who is it?", [1.0, *[0.0] * (EMBEDDING_DIMENSION - 1)]
+    )
+    await _add_chunk(db_session, rulebook, (1, 2), "Setup.", [-value for value in query])
 
 
 async def test_family_game_ids_returns_a_base_game_and_its_expansions(
@@ -69,30 +98,33 @@ async def test_family_game_ids_returns_the_whole_family_for_an_expansion(
 
 async def test_evaluate_question_scores_the_top_k_results(db_session: AsyncSession) -> None:
     embedder = FakeEmbedder()
-    question = GoldenQuestion(
-        id="q-1",
-        game="Base",
-        question="Who goes first?",
-        expected=[ExpectedPlace(file="Base.pdf", pages=[2])],
-        answer="The youngest player.",
-        tags=[],
-    )
-    query = embedder.embed_query(question.question)
-    _, rulebook = await _add_game(db_session, "Base")
-    # Ranked by distance to the query: the miss first, then one hit, then the other. The fake
-    # reranker scores them all 0, since "Setup." has none of the question's words, so they stay.
-    await _add_chunk(db_session, rulebook, (5, 5), query)
-    await _add_chunk(db_session, rulebook, (2, 3), [1.0, *[0.0] * (EMBEDDING_DIMENSION - 1)])
-    await _add_chunk(db_session, rulebook, (1, 2), [-value for value in query])
+    await _add_ranked_chunks(db_session, embedder)
 
-    result = await evaluate_question(db_session, embedder, FakeReranker(), question, k=2)
+    result = await evaluate_question(db_session, embedder, None, QUESTION, k=2)
 
-    hit_at_2 = 1 / math.log2(3)
     assert result == QuestionResult(
-        question=question,
+        question=QUESTION,
         places=[Place("Base.pdf", 5, 5), Place("Base.pdf", 2, 3)],
         hits=[False, True],
         recall=1.0,
         reciprocal_rank=0.5,
-        ndcg=hit_at_2 / (1 + hit_at_2),
+        ndcg=HIT_AT_2 / (1 + HIT_AT_2),
+    )
+
+
+async def test_evaluate_question_scores_the_reranked_results_with_a_reranker(
+    db_session: AsyncSession,
+) -> None:
+    embedder = FakeEmbedder()
+    await _add_ranked_chunks(db_session, embedder)
+
+    result = await evaluate_question(db_session, embedder, FakeReranker(), QUESTION, k=2)
+
+    assert result == QuestionResult(
+        question=QUESTION,
+        places=[Place("Base.pdf", 2, 3), Place("Base.pdf", 5, 5)],
+        hits=[True, False],
+        recall=1.0,
+        reciprocal_rank=1.0,
+        ndcg=1 / (1 + HIT_AT_2),
     )
