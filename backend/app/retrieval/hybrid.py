@@ -1,6 +1,7 @@
 """Hybrid search over chosen games' chunks: vector and full-text search merged with RRF."""
 
 import asyncio
+import re
 from dataclasses import dataclass
 
 from sqlalchemy import func, select
@@ -39,12 +40,15 @@ async def vector_search(
 async def full_text_search(
     session: AsyncSession, query: str, game_ids: list[int], limit: int
 ) -> list[int]:
-    """Chunk ids of the given games that match the query's words, best match first."""
-    tsquery = func.websearch_to_tsquery("english", query)
+    """Chunk ids of the given games that have any of the query's words, best match first."""
+    # "or" between the words makes a chunk match with any of them, not only with all; stop words
+    # are still dropped and other forms of a word still match.
+    tsquery = func.websearch_to_tsquery("english", " or ".join(re.findall(r"\w+", query)))
     ids = await session.scalars(
         select(Chunk.id)
         .where(Chunk.game_id.in_(game_ids), Chunk.tsv.bool_op("@@")(tsquery))
-        .order_by(func.ts_rank_cd(Chunk.tsv, tsquery).desc(), Chunk.id)
+        # ts_rank counts the matches; ts_rank_cd's word-closeness ranked OR matches worse.
+        .order_by(func.ts_rank(Chunk.tsv, tsquery).desc(), Chunk.id)
         .limit(limit)
     )
     return list(ids)

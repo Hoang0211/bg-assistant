@@ -77,6 +77,20 @@ async def test_full_text_search_matches_other_forms_of_a_word(db_session: AsyncS
     assert await full_text_search(db_session, "trading", [game.id], limit=10) == [chunk.id]
 
 
+async def test_full_text_search_matches_chunks_with_any_of_the_words(
+    db_session: AsyncSession,
+) -> None:
+    game, rulebook = await _add_game(db_session, "Catan")
+    both = await _add_chunk(db_session, rulebook, "Players trade resources.", _vector(1))
+    one = await _add_chunk(db_session, rulebook, "Move the robber.", _vector(1))
+    await _add_chunk(db_session, rulebook, "Roll the dice.", _vector(1))
+
+    query = "Can I trade resources with the robber?"
+    ids = await full_text_search(db_session, query, [game.id], limit=10)
+
+    assert ids == [both.id, one.id]
+
+
 async def test_full_text_search_ranks_the_better_match_first(db_session: AsyncSession) -> None:
     game, rulebook = await _add_game(db_session, "Catan")
     once = await _add_chunk(db_session, rulebook, "Trade with the bank.", _vector(1))
