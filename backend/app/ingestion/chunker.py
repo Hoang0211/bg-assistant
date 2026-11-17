@@ -225,17 +225,29 @@ def _split_at_headings(elements: list[Element]) -> list[_Section]:
     ]
 
 
+def _share_a_page(earlier: list[Element], later: list[Element]) -> bool:
+    return min(element.page for element in later) <= max(_last_page(element) for element in earlier)
+
+
 def _merge_small_sections(
     sections: list[_Section], count_tokens: Callable[[str], int], min_tokens: int
 ) -> list[_Section]:
     merged: list[_Section] = []
     for heading, section in sections:
-        if merged and count_tokens(_content(section)) < min_tokens:
+        if (
+            merged
+            and count_tokens(_content(section)) < min_tokens
+            and _share_a_page(merged[-1][1], section)
+        ):
             merged[-1][1].extend(section)
         else:
             merged.append((heading, section))
 
-    if len(merged) > 1 and count_tokens(_content(merged[0][1])) < min_tokens:
+    if (
+        len(merged) > 1
+        and count_tokens(_content(merged[0][1])) < min_tokens
+        and _share_a_page(merged[0][1], merged[1][1])
+    ):
         (_, first), (heading, second) = merged[:2]
         merged[:2] = [(heading, [second[0], *first, *second[1:]])]
 

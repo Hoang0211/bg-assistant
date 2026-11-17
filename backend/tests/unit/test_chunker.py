@@ -115,6 +115,26 @@ def test_chunk_elements_merges_a_small_section_into_the_previous_one() -> None:
     elements = [
         Element(ElementKind.HEADING, "Setup", 1),
         Element(ElementKind.PARAGRAPH, "Place the board now.", 1),
+        Element(ElementKind.HEADING, "Illustration A", 1),
+        Element(ElementKind.PARAGRAPH, "See here.", 1),
+    ]
+
+    assert chunk_elements(elements, count_words, limits(min_tokens=5)) == [
+        TextChunk(
+            section_path="Setup",
+            chunk_type=ChunkType.SECTION,
+            page_start=1,
+            page_end=1,
+            content="Setup\n\nPlace the board now.\n\nIllustration A\n\nSee here.",
+        ),
+    ]
+
+
+def test_chunk_elements_merges_a_small_section_on_the_page_the_previous_one_ends() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Setup", 1),
+        Element(ElementKind.PARAGRAPH, "Place the board now.", 1),
+        Element(ElementKind.PARAGRAPH, "Then deal the cards.", 2),
         Element(ElementKind.HEADING, "Illustration A", 2),
         Element(ElementKind.PARAGRAPH, "See here.", 2),
     ]
@@ -125,12 +145,59 @@ def test_chunk_elements_merges_a_small_section_into_the_previous_one() -> None:
             chunk_type=ChunkType.SECTION,
             page_start=1,
             page_end=2,
-            content="Setup\n\nPlace the board now.\n\nIllustration A\n\nSee here.",
+            content=(
+                "Setup\n\nPlace the board now.\n\nThen deal the cards.\n\n"
+                "Illustration A\n\nSee here."
+            ),
+        ),
+    ]
+
+
+def test_chunk_elements_keeps_a_small_section_on_a_later_page_apart() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Setup", 1),
+        Element(ElementKind.PARAGRAPH, "Place the board now.", 1),
+        Element(ElementKind.HEADING, "Illustration A", 2),
+        Element(ElementKind.PARAGRAPH, "See here.", 2),
+    ]
+
+    assert chunk_elements(elements, count_words, limits(min_tokens=5)) == [
+        TextChunk(
+            section_path="Setup",
+            chunk_type=ChunkType.SECTION,
+            page_start=1,
+            page_end=1,
+            content="Setup\n\nPlace the board now.",
+        ),
+        TextChunk(
+            section_path="Illustration A",
+            chunk_type=ChunkType.SECTION,
+            page_start=2,
+            page_end=2,
+            content="Illustration A\n\nSee here.",
         ),
     ]
 
 
 def test_chunk_elements_merges_a_small_first_section_into_the_next_one() -> None:
+    elements = [
+        Element(ElementKind.PARAGRAPH, "Welcome", 1),
+        Element(ElementKind.HEADING, "Setup", 1),
+        Element(ElementKind.PARAGRAPH, "Place the board on the table.", 1),
+    ]
+
+    assert chunk_elements(elements, count_words, limits(min_tokens=5)) == [
+        TextChunk(
+            section_path="Setup",
+            chunk_type=ChunkType.SECTION,
+            page_start=1,
+            page_end=1,
+            content="Setup\n\nWelcome\n\nPlace the board on the table.",
+        ),
+    ]
+
+
+def test_chunk_elements_keeps_a_small_first_section_on_an_earlier_page_apart() -> None:
     elements = [
         Element(ElementKind.PARAGRAPH, "Welcome", 1),
         Element(ElementKind.HEADING, "Setup", 2),
@@ -139,11 +206,18 @@ def test_chunk_elements_merges_a_small_first_section_into_the_next_one() -> None
 
     assert chunk_elements(elements, count_words, limits(min_tokens=5)) == [
         TextChunk(
-            section_path="Setup",
+            section_path="",
             chunk_type=ChunkType.SECTION,
             page_start=1,
+            page_end=1,
+            content="Welcome",
+        ),
+        TextChunk(
+            section_path="Setup",
+            chunk_type=ChunkType.SECTION,
+            page_start=2,
             page_end=2,
-            content="Setup\n\nWelcome\n\nPlace the board on the table.",
+            content="Setup\n\nPlace the board on the table.",
         ),
     ]
 
@@ -152,8 +226,8 @@ def test_chunk_elements_keeps_a_section_at_the_minimum() -> None:
     elements = [
         Element(ElementKind.HEADING, "Setup", 1),
         Element(ElementKind.PARAGRAPH, "Place the board.", 1),
-        Element(ElementKind.HEADING, "Trading", 2),
-        Element(ElementKind.PARAGRAPH, "Trade with banks.", 2),
+        Element(ElementKind.HEADING, "Trading", 1),
+        Element(ElementKind.PARAGRAPH, "Trade with banks.", 1),
     ]
 
     assert chunk_elements(elements, count_words, limits(min_tokens=4)) == [
@@ -167,8 +241,8 @@ def test_chunk_elements_keeps_a_section_at_the_minimum() -> None:
         TextChunk(
             section_path="Trading",
             chunk_type=ChunkType.SECTION,
-            page_start=2,
-            page_end=2,
+            page_start=1,
+            page_end=1,
             content="Trading\n\nTrade with banks.",
         ),
     ]
@@ -195,10 +269,10 @@ def test_chunk_elements_merges_consecutive_small_sections_into_one() -> None:
     elements = [
         Element(ElementKind.HEADING, "Setup", 1),
         Element(ElementKind.PARAGRAPH, "Place the board now.", 1),
-        Element(ElementKind.HEADING, "Illustration A", 2),
-        Element(ElementKind.PARAGRAPH, "See here.", 2),
-        Element(ElementKind.HEADING, "Illustration B", 3),
-        Element(ElementKind.PARAGRAPH, "See there.", 3),
+        Element(ElementKind.HEADING, "Illustration A", 1),
+        Element(ElementKind.PARAGRAPH, "See here.", 1),
+        Element(ElementKind.HEADING, "Illustration B", 1),
+        Element(ElementKind.PARAGRAPH, "See there.", 1),
     ]
 
     assert chunk_elements(elements, count_words, limits(min_tokens=5)) == [
@@ -206,7 +280,7 @@ def test_chunk_elements_merges_consecutive_small_sections_into_one() -> None:
             section_path="Setup",
             chunk_type=ChunkType.SECTION,
             page_start=1,
-            page_end=3,
+            page_end=1,
             content=(
                 "Setup\n\nPlace the board now.\n\n"
                 "Illustration A\n\nSee here.\n\n"
@@ -706,8 +780,8 @@ def test_chunk_elements_does_not_merge_a_small_table() -> None:
     elements = [
         Element(ElementKind.HEADING, "Setup", 2),
         Element(ElementKind.PARAGRAPH, "Place the board.", 2),
-        Element(ElementKind.HEADING, "Costs", 3),
-        Element(ElementKind.TABLE, TABLE, 3),
+        Element(ElementKind.HEADING, "Costs", 2),
+        Element(ElementKind.TABLE, TABLE, 2),
     ]
 
     assert chunk_elements(elements, count_words, limits(min_tokens=20)) == [
@@ -721,8 +795,8 @@ def test_chunk_elements_does_not_merge_a_small_table() -> None:
         TextChunk(
             section_path="Costs",
             chunk_type=ChunkType.TABLE,
-            page_start=3,
-            page_end=3,
+            page_start=2,
+            page_end=2,
             content=f"Costs\n\n{TABLE}",
         ),
     ]
