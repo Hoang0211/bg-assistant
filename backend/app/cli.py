@@ -160,19 +160,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     configure_logging()
     args = _parser().parse_args(argv)
     settings = get_settings()
+    # The eval commands work on their own database, on the same server.
+    eval_url = eval_database_url(settings.database_url, settings.eval_database_name)
+    eval_settings = settings.model_copy(update={"database_url": eval_url})
     # Async psycopg on Windows needs the selector event loop.
     loop_factory = asyncio.SelectorEventLoop if sys.platform == "win32" else None
     if args.command == "eval-ingest":
-        url = eval_database_url(settings.database_url, settings.eval_database_name)
         # Alembic runs its own event loop, so the database is made ready before ours starts.
-        create_database_if_missing(url)
-        migrate(url)
-        eval_settings = settings.model_copy(update={"database_url": url})
+        create_database_if_missing(eval_url)
+        migrate(eval_url)
         return asyncio.run(_eval_ingest(eval_settings), loop_factory=loop_factory)
 
     if args.command == "eval":
-        url = eval_database_url(settings.database_url, settings.eval_database_name)
-        eval_settings = settings.model_copy(update={"database_url": url})
         return asyncio.run(_eval(eval_settings), loop_factory=loop_factory)
 
     return asyncio.run(_reindex(settings, args.game), loop_factory=loop_factory)

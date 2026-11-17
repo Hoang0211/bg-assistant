@@ -1,5 +1,6 @@
 from typing import Any
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import EMBEDDING_DIMENSION, Chunk, ChunkType, Game, Rulebook
@@ -67,6 +68,24 @@ async def test_vector_search_returns_only_the_given_games_chunks(
     await _add_chunk(db_session, other_rulebook, "Azul", _vector(1, 0))
 
     assert await vector_search(db_session, _vector(1, 0), [game.id], limit=10) == [chunk.id]
+
+
+async def test_vector_search_finds_a_games_chunks_behind_many_closer_ones(
+    db_session: AsyncSession,
+) -> None:
+    game, rulebook = await _add_game(db_session, "Catan")
+    _, other_rulebook = await _add_game(db_session, "Azul")
+    far = [await _add_chunk(db_session, rulebook, "Catan", _vector(0, 1)) for _ in range(3)]
+    for _ in range(50):
+        await _add_chunk(db_session, other_rulebook, "Azul", _vector(1, 0))
+    # Rule out every plan but the HNSW index, which would keep only its 40 nearest neighbours,
+    # all of them Azul's, and then drop them as another game's.
+    for setting in ("enable_seqscan", "enable_bitmapscan", "enable_sort"):
+        await db_session.execute(text(f"SET LOCAL {setting} = off"))
+
+    ids = await vector_search(db_session, _vector(1, 0), [game.id], limit=10)
+
+    assert ids == [chunk.id for chunk in far]
 
 
 async def test_full_text_search_matches_other_forms_of_a_word(db_session: AsyncSession) -> None:

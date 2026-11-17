@@ -30,8 +30,9 @@ def test_golden_questions_match_the_library() -> None:
     library = read_library(Path("eval/library.json"))
     expansions = [expansion for game in library.games for expansion in game.expansions]
     games: list[LibraryGame | LibraryExpansion] = [*library.games, *expansions]
-    names = {game.name for game in games}
+    names = [game.name for game in games]
     files = {rulebook.file for game in games for rulebook in game.rulebooks}
 
-    assert {question.game for question in questions} <= names
+    assert len(set(names)) == len(names)  # the eval finds each question's game by its name
+    assert {question.game for question in questions} <= set(names)
     assert {place.file for question in questions for place in question.expected} <= files

@@ -43,6 +43,22 @@ def test_migrate_creates_the_tables(new_database_url: str) -> None:
     assert {"games", "rulebooks", "chunks"} <= tables
 
 
+def test_migrate_accepts_a_percent_escaped_password(new_database_url: str) -> None:
+    create_database_if_missing(new_database_url)
+    # %74 is "t": the test server's password "test", written the way a password with a special
+    # character has to be (the @ in "p@ss" as %40).
+    escaped = new_database_url.replace(":test@", ":%74est@")
+    assert escaped != new_database_url
+
+    migrate(escaped)
+
+    engine = create_engine(new_database_url)
+    with engine.connect() as connection:
+        tables = set(inspect(connection).get_table_names())
+    engine.dispose()
+    assert {"games", "rulebooks", "chunks"} <= tables
+
+
 def test_migrate_keeps_the_callers_logging(new_database_url: str) -> None:
     create_database_if_missing(new_database_url)
     handlers = list(logging.getLogger().handlers)

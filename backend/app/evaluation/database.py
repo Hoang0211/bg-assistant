@@ -34,7 +34,9 @@ def create_database_if_missing(url: str) -> bool:
 def migrate(url: str) -> None:
     """Apply every Alembic migration to the URL's database."""
     config = Config("alembic.ini")
-    config.set_main_option("sqlalchemy.url", url)
+    # Alembic's config reads % as the start of a variable, and a password's special characters
+    # are written as %-escapes in a URL (@ as %40), so each % is doubled.
+    config.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
     # The caller has set up logging already; env.py would otherwise replace it.
     config.attributes["configure_logger"] = False
     command.upgrade(config, "head")
