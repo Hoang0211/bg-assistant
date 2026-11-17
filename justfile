@@ -108,3 +108,13 @@ download-models:
 [working-directory: 'backend']
 reindex *args:
     uv run python -m app.cli reindex {{args}}
+
+# Build the eval database from backend/eval/library.json and ingest its rulebooks (about 10 minutes).
+[working-directory: 'backend']
+eval-ingest:
+    uv run python -m app.cli eval-ingest
+
+# Search the eval database for each golden question and write a report to backend/eval/reports/.
+[working-directory: 'backend']
+eval:
+    uv run python -m app.cli eval

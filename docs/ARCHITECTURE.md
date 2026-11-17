@@ -27,7 +27,7 @@ There is no authentication: it's a single-user app that runs on one machine.
 | ORM / migrations | SQLAlchemy 2.0 (async, psycopg 3) + Alembic | psycopg 3 is also the driver the LangGraph checkpointer uses, so there's one Postgres driver. The checkpointer creates its own tables with `.setup()` at startup, outside Alembic |
 | PDF parsing | Docling for ingestion; PyMuPDF to check uploads | Rulebooks vary a lot in fonts, columns, sidebars and tables. Docling finds structure from the page layout, gives the correct reading order and tables, drops headers and footers, and runs OCR on pages with little text, locally on the CPU (about 4 s per page without OCR, which is fine for one-off ingestion). PyMuPDF opens an upload in milliseconds to check it's a readable PDF and read its page count |
 | Embeddings | `BAAI/bge-base-en-v1.5` via sentence-transformers (768 dimensions; GPU, or CPU as a fallback) | Free, local and offline. Its 512-token input limit caps chunks at about 450 tokens (counted with the BGE tokenizer). Queries get the BGE query prefix and chunks don't; vectors are normalised and compared by cosine similarity |
-| Reranker | `BAAI/bge-reranker-base` cross-encoder | Better precision for rules lookups |
+| Reranker | `BAAI/bge-reranker-base` cross-encoder | On trial: meant to sharpen the top 5, but in 5a it didn't beat hybrid search; 5b decides whether it stays |
 | LLM | OpenAI (official `openai` SDK) behind a small `LLMProvider` interface with two implementations, `openai` and `fake` | Structured outputs with Pydantic models, function calling and streaming. Two model names are defaults in `config.py`: `chat_model` (rules agent, recommendation answers) and `fast_model` (router, filter extraction). `.env` holds only secrets and switches. The fake provider keeps tests and CI deterministic, with no API key |
 | Web search | OpenAI's built-in web search tool (Responses API), exposed as `LLMProvider.web_search(query) → {answer, sources[]}` | Answers rules questions the rulebook doesn't cover, only after the user agrees. No extra vendor or key. `web_search_enabled` in `config.py` turns it off |
 | Chat orchestration | LangGraph `StateGraph` + `langgraph-checkpoint-postgres` (`AsyncPostgresSaver`) | The graph holds the router, both paths and the agent loop. The checkpointer saves each conversation's state in Postgres (`thread_id` = conversation ID). `interrupt()` pauses for clarification questions and `Command(resume=…)` continues. Nodes call our `LLMProvider` instead of LangChain model wrappers, so the fake provider drives the tests |
@@ -46,7 +46,7 @@ bg-assistant/
 │  ├─ pyproject.toml, uv.lock, alembic/, Dockerfile
 │  ├─ app/
 │  │  ├─ main.py, config.py (pydantic-settings), export_openapi.py
-│  │  ├─ cli.py           reindex and chat commands for using the engine from a terminal
+│  │  ├─ cli.py           reindex, eval-ingest, eval and chat commands for using the engine from a terminal
 │  │  ├─ tracing.py       LangSmith setup: wrapped OpenAI client, run metadata helpers
 │  │  ├─ errors.py        error kinds the services raise (NotFoundError, RuleViolationError, TooLargeError), free of HTTP
 │  │  ├─ api/             health.py, games.py, rulebooks.py, chat.py, deps.py,
@@ -59,11 +59,14 @@ bg-assistant/
 │  │  ├─ ingestion/       pdf_info.py (PyMuPDF: readable check, page count),
 │  │  │                   layout_parser.py (Docling → typed elements), chunker.py, embedder.py,
 │  │  │                   quality.py (parse report), pipeline.py, jobs.py
-│  │  ├─ retrieval/       hybrid.py (vector + full-text, RRF), reranker.py
+│  │  ├─ retrieval/       hybrid.py (vector + full-text, RRF), reranker.py,
+│  │  │                   search.py (hybrid candidates reranked: the search chat and the eval use)
+│  │  ├─ evaluation/      library.py, database.py (the eval database), questions.py, metrics.py,
+│  │  │                   retrieval.py (scores each question), report.py
 │  │  └─ chat/            state.py, graph.py, prompts.py, streaming.py (graph stream → SSE events)
 │  │                      nodes/ router.py, recommend.py, rules_agent.py, tools.py, clarify.py,
 │  │                             reply.py, web_answer.py
-│  ├─ eval/               golden datasets, run_eval.py, reports/
+│  ├─ eval/               golden_questions.json, library.json, reports/
 │  ├─ data/uploads/       uploaded rulebook PDFs (gitignored; mounted into the backend container)
 │  └─ tests/              unit/, integration/, fixtures/ (small sample PDFs)
 ├─ frontend/
@@ -81,7 +84,7 @@ bg-assistant/
 ├─ docker-compose.yml     db (pgvector), backend, frontend
 ├─ justfile               every development command
 ├─ .pre-commit-config.yaml
-└─ .github/workflows/     ci.yml, eval.yml
+└─ .github/workflows/     ci.yml
 ```
 
 ## Data model
@@ -117,7 +120,7 @@ Games and rulebooks are separate operations: a game is created from its fields a
      - **In a child process:** the parse runs in `python -m app.ingestion.parse_process`, which writes the elements to a temporary JSON file, so a crash in Docling's native code (OCR on Windows once corrupted the heap at random) can't take the backend down. A child that exits with an error is tried again, up to `parse_attempts` times. A child still running after `parse_timeout_seconds` is killed and the rulebook fails without a retry, since a parse that slow would most likely be as slow again; without the limit, a hung parse would block every rulebook queued behind it.
      - **OCR only where needed:** PyMuPDF first counts each page's characters. Docling parses the whole PDF without OCR, then re-parses each page under `ocr_min_page_chars` (a setting in `config.py`) with OCR and uses those elements instead. On a PDF with a text layer, OCR mostly reads decorative title art into fake headings and doubles the parse time (Catan: 154 s with OCR, 80 s without). Text that exists only inside images on pages that do have text (card counts, icons) is lost, and the parse report can't flag it: rulebooks put a full-page background image behind every page, so measuring image coverage can't tell an illustrated page from a plain one. The report lists the pages read with OCR, whose text may have recognition errors, and the pages where no text was kept at all.
    - **Chunk (rulebook-aware):**
-     - Split at every heading. Merge sections under ~80 tokens into the previous one (into the next one only when there's no previous one), so fake headings ("Illustration A", an "Example" box title) join the rule they belong to; split long ones at paragraph or list breaks, targeting ~350 tokens with a hard limit of ~450. A chunk's last element is repeated at the start of the next chunk if it's at most ~50 tokens, and otherwise there's no overlap. A paragraph still over the limit is split at sentence ends, and a sentence still over it by token count, because the embedder silently cuts off anything past 512 tokens.
+     - Split at every heading. Merge sections under ~80 tokens into the previous one (into the next one only when there's no previous one), but only when the two share a page, so fake headings ("Illustration A", an "Example" box title) join the rule they belong to without stretching a chunk's page citation onto another page; split long ones at paragraph or list breaks, targeting ~350 tokens with a hard limit of ~450. A chunk's last element is repeated at the start of the next chunk if it's at most ~50 tokens, and otherwise there's no overlap. A paragraph still over the limit is split at sentence ends, and a sentence still over it by token count, because the embedder silently cuts off anything past 512 tokens.
      - A paragraph cut by a page break comes out as two items. When a text item doesn't end with `.`, `!`, `?` or `:` and the next item is text at the top of the next page that doesn't start with a capital letter, the two are joined into one paragraph, so a split never lands mid-sentence.
      - Sidebars and "Example" boxes have no label of their own: Docling places their text in reading order, so it joins the section it's printed in.
      - Each table is its own chunk, starting with its heading, and isn't merged with text; the text around it stays together in a section chunk. A table over the limit is split between rows with the heading and header row repeated, and a single row still over it is cut between words. Docling's Markdown padding is removed first, because every dash in the `|---|` line counts as a token.
@@ -188,10 +191,10 @@ The `rules_agent` node calls `chat_model` with four tools. Conditional edges sen
 
 - **`find_games(query)`:** pg_trgm fuzzy matching; returns candidate base games and their expansions, and whether each has a ready rulebook.
 - **`search_rules(game_id, expansion_ids[], query)`:** hybrid retrieval scoped to the selected game and expansions:
-  1. vector search: top 30 by cosine similarity (with the BGE query prefix, HNSW index)
-  2. keyword search: top 30 by Postgres full-text rank (`websearch_to_tsquery`)
+  1. vector search: top 30 by cosine similarity (with the BGE query prefix), exact within the chosen games: sorting ties by chunk id keeps Postgres off the HNSW index, which would apply the game filter after its nearest neighbours and could return too few
+  2. keyword search: top 30 by Postgres full-text rank among chunks with any of the question's words (`websearch_to_tsquery` with `or` between the words, ranked by `ts_rank`); requiring every word matched chunks for only 5 of the 30 golden questions
   3. Reciprocal Rank Fusion (k = 60), keep the top 20
-  4. rerank with `bge-reranker-base`, send the top 5 to the LLM, each shown as `[<Game name> (base game | expansion) › <section path>, p. X–Y]` followed by its text; the name comes from a join, so it's always current
+  4. rerank with `bge-reranker-base` (only if 5b's eval shows it beats hybrid search), send the top 5 to the LLM, each shown as `[<Game name> (base game | expansion) › <section path>, p. X–Y]` followed by its text; the name comes from a join, so it's always current
 
   All four counts are settings in `config.py`, so the evaluation can compare values.
 - **`ask_user(question, options[])`:** the `clarify` node calls `interrupt({question, options})`. The state is checkpointed, so a waiting question survives a backend restart. The UI shows the options as chips; `/resume` writes `game_id` and `expansion_ids` into the state and returns the answer to the agent. `clarify` does nothing before `interrupt()`, because LangGraph reruns the node from the start on resume.
@@ -207,13 +210,15 @@ The `rules_agent` node calls `chat_model` with four tools. Conditional edges sen
 
 ## Evaluation
 
-- `backend/eval/` holds a golden dataset of about 30–50 questions with expected pages, from 2–3 freely available rulebooks.
-- **Retrieval (no LLM, free):** Recall@k, MRR and nDCG, comparing vector-only, full-text-only, hybrid, and hybrid + reranker. A retrieved chunk is a hit when an expected page falls inside its `page_start`–`page_end` range; an answer spread over two pages lists both, and covering either counts.
-- **Parsers (milestone 5b):** the retrieval eval runs on both parsers, plus how much of each page's PDF text the parse kept (to catch dropped or invented text), the cost and the time. The winner stays.
-- **Answers (LLM-as-judge):** faithfulness, correctness and citation accuracy, plus clarification behaviour (asks when it should, stays quiet when it shouldn't) and a few out-of-scope questions (declines, then offers web search only for those).
+- **Golden questions:** `backend/eval/golden_questions.json` holds 30 questions from 7 rulebooks across 5 games (Sea Salt & Paper with its Extra Salt and Extra Pepper expansions, Rebel Princess, Splendor, Catan, Power Grid), written from the PDFs before looking at any retrieval results. Each lists where its answer is printed (rulebook file and pages), a short answer, and tags for what makes it hard (text in pictures, OCR, tables, callouts, short sections, answers that change with an expansion). The PDFs aren't committed: they live in the git-ignored `backend/data/rulebooks/`, and the questions only point at pages.
+- **Eval database:** the eval runs against its own database, `bg_assistant_eval` in the same Postgres, never the dev library, so adding or deleting games in the app can't change a score. `just eval-ingest` rebuilds it through the normal ingestion pipeline, from the PDFs and `backend/eval/library.json` (each game, which games are its expansions, and its rulebook file). Run it after a parser or chunker change.
+- **Retrieval (no LLM, free):** Recall@k, MRR and nDCG of hybrid search and of hybrid search reranked, side by side in one report, so it shows whether the reranker earns its cost. Each question searches its game's whole family (the base game and all its expansions), as chat would. A retrieved chunk is a hit when it comes from an expected rulebook and an expected page falls inside its `page_start`–`page_end` range; covering any expected place counts. Pages stand in for the right text, so a chunk on the right page counts even if it's about something else.
+- **Retrieval tuning (5a, 2026-11-17):** on 134 chunks, hybrid search scores Recall@5 0.93 and MRR 0.87, and reranked search 0.90 and 0.83. Kept: small sections merge only within a page (narrower citations, same scores) and full-text search matches any of the question's words (hybrid MRR 0.85 → 0.87). Tried and left out: `traverse_pictures=True` (one more answer found, but hundreds of noise elements) and other candidate counts (no change). The questions still missed fail on the parse (text in pictures) or the chunking (a long section, a first section under the next heading), which 5b's parser targets.
+- **Parsers (milestone 5b):** the two parsers are compared on the retrieval eval, on how much of each page's PDF text the parse kept (to catch dropped or invented text), on an answer check, and on cost and time. The answer check sends each question's top 5 chunks to the chat model and has a judge model compare the answer with the golden `answer`. It's the only measure that sees whether a chunk's text is usable, such as a table kept as rows rather than loose numbers. With 30 questions, a gap of one or two is noise, so the questions where the parsers disagree are read by hand. The winner stays.
+- **Answers (LLM-as-judge, milestone 6):** faithfulness, correctness and citation accuracy, reusing the judge from 5b's answer check, plus clarification behaviour (asks when it should, stays quiet when it shouldn't; the `expansion-dependent` questions are the cases where it should ask) and a few out-of-scope questions (declines, then offers web search only for those).
 - **Routing:** about 40 labelled messages, including tricky ones; accuracy and a confusion matrix.
-- Results go into a Markdown report, and the README shows the results table.
-- `eval.yml` runs the retrieval eval nightly and on demand. The routing and answer evals spend OpenAI credit, so they run on demand only, and are skipped when the `OPENAI_API_KEY` secret isn't set. Locally, `just eval` runs retrieval only and `just eval --all` runs all three.
+- **Reports:** each run writes a Markdown report to `backend/eval/reports/`. Reports are committed, so a pull request shows its effect on the scores, and the README shows the final table.
+- **Local only:** the rulebooks can't be committed, so CI has nothing to ingest, and a score means something only next to another run. `just eval` runs retrieval; `just eval --all` adds routing and answers, which spend OpenAI credit. CI runs unit tests of the metric functions on hand-made rankings.
 
 ## Testing strategy
 
@@ -224,7 +229,7 @@ Tests are written with each feature, not at the end. A milestone is done only wh
 - **Integration tests:** a testcontainers pgvector database, with a test that the migrations match the models (`alembic check`); the API through httpx `AsyncClient` (including message → interrupt → resume with the Postgres checkpointer; rulebook uploads, where every rejection leaves no row and no file; moving and deleting rulebooks; range requests on the file; reindex transactions); ingestion and retrieval on small fixture PDFs with different layouts (single column, two columns with an Example box, a scanned page); the ingestion worker run directly against the test database, while the app's own worker is off in tests (`RUN_INGESTION_WORKER=false`), so starting the app never ingests the dev database's rulebooks.
 - **Guard against real LLM calls:** pytest's environment forces `LLM_PROVIDER=fake`, clears `OPENAI_API_KEY` and turns LangSmith off; `pytest-socket` blocks all network access except localhost. A test that reaches for OpenAI fails instead of spending credit.
 - **Live tests:** a few tests marked `live`, one per real call type, check that OpenAI accepts the strict schemas and tool definitions. They're skipped by default and run with `just test-live`.
-- **Real models only where needed:** unit tests use a `FakeEmbedder` and no reranker; only the ingestion and retrieval integration tests load the BGE models and Docling. A guard test checks that importing the app loads neither Docling nor PyTorch.
+- **Real models only where needed:** other tests use a `FakeEmbedder` and a `FakeReranker`; only the embedder, reranker and ingestion integration tests load the BGE models and Docling. A guard test checks that importing the app loads neither Docling nor PyTorch.
 
 **Frontend**
 - Vitest + React Testing Library + MSW for components and the API client.
@@ -261,9 +266,9 @@ Tests are written with each feature, not at the end. A milestone is done only wh
 3. **Rulebooks API:** adding a rulebook to a game (size limit, PyMuPDF check and page count, the duplicate check, file storage), listing all and per game, rename and move, delete with its file, serving the file with range requests, and deleting a game's files with the game. No LLM yet. Tests: every rejection leaving no row and no file, a failed commit removing the written file, duplicates across games, rename and move, delete removing the file, a range request returning 206, game deletion removing files.
 4. **Ingestion:** the Docling parser, the chunker, prefixes, the embedder, the parse report (returned with each rulebook), the background job, moving a rulebook updating its chunks, and `just reindex`. Tests: every chunker rule, the fake embedder, the three layout fixtures, parse report flags, transactional reindex, job status, a move updating chunks.
 
-5a. **Retrieval and evaluation:** hybrid search, RRF, the reranker, the golden dataset and retrieval metrics; tune the chunker (first: never merge small sections across a page break) and the candidate counts. Tests: RRF, scoping to the chosen game, reranker ordering, current game names.
+5a. **Retrieval and evaluation:** hybrid search (vector, full text matching any word, RRF) scoped to a game's family, the reranker (on trial until 5b), the eval database (`just eval-ingest`), the golden questions and retrieval metrics (`just eval`, hybrid and reranked side by side), and tuning: small sections merge only within a page; `traverse_pictures=True` and other candidate counts were tried and left out. Tests: RRF, scoping to the chosen game, reranked and unreranked search, current game names, the metric functions, the report.
 
-5b. **LLM parser:** `LLMProvider` (OpenAI and fake), LangSmith tracing from this first LLM call on, and `just test-live`. A parser sends each page image to a vision model, which writes it as Markdown following a fixed contract (verbatim text, real headings with levels, captions and box titles as bold text, informative text in pictures written out, no page numbers or hidden copies); our code adds a marker for each page. A chunker splits at the Markdown headings and never merges across a page. 5a's eval compares it with Docling and the current chunker, and the one that loses is removed. The PDF is still stored, for the viewer, citations and re-conversion. If it wins, milestone 8 adds a view and editor for each rulebook's Markdown (saving re-ingests it). Tests: the contract on scripted fake responses, the new chunker's rules, a live test.
+5b. **LLM parser:** `LLMProvider` (OpenAI and fake), LangSmith tracing from this first LLM call on, and `just test-live`. A parser sends each page image to a vision model, which writes it as Markdown following a fixed contract (verbatim text, real headings with levels, captions and box titles as bold text, informative text in pictures written out, no page numbers or hidden copies); our code adds a marker for each page. A chunker splits at the Markdown headings and never merges across a page. 5a's eval and an answer check (each question's top 5 chunks → the chat model → a judge against the golden answer) compare it with Docling and the current chunker, and the one that loses is removed. The PDF is still stored, for the viewer, citations and re-conversion. If it wins, milestone 8 adds a view and editor for each rulebook's Markdown (saving re-ingests it). It also decides the reranker: it stays in chat only if it beats hybrid search on the winning parser's chunks. Tests: the contract on scripted fake responses, the new chunker's rules, the answer check on scripted fake responses, a live test.
 
 6. **Chat graph:** add `web_search` to the `LLMProvider`; state, the graph with the Postgres checkpointer, router, recommendation nodes, the agent loop, both interrupts, `web_answer`, the chat API with SSE, the routing and answer evals, and `just chat`. Tests: graph tests, filter relaxation, SSE mapping, API interrupt and resume, separate conversation state, live tests.
 

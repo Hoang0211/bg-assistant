@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     # Relative paths are resolved from the directory the app runs in (backend/).
     upload_dir: Path = Path("data/uploads")
 
+    # The eval's own database, on the same server as database_url; just eval-ingest builds it.
+    eval_database_name: str = "bg_assistant_eval"
+
+    # The eval's questions and library, and the rulebook PDFs it's built from.
+    eval_dir: Path = Path("eval")
+    eval_rulebooks_dir: Path = Path("data/rulebooks")
+
     # Largest rulebook PDF accepted, in MB.
     max_upload_mb: int = 50
 
@@ -44,6 +51,19 @@ class Settings(BaseSettings):
     # Embedding model from Hugging Face. Changing it means reindexing, and a migration if its
     # vector size differs.
     embedding_model: str = "BAAI/bge-base-en-v1.5"
+
+    # Hybrid search: candidates kept from vector and from full-text search, Reciprocal Rank
+    # Fusion's k, and how many fused chunks go on to the reranker.
+    vector_candidates: int = 30
+    full_text_candidates: int = 30
+    rrf_k: int = 60
+    fused_candidates: int = 20
+
+    # Cross-encoder from Hugging Face that reranks the fused chunks.
+    reranker_model: str = "BAAI/bge-reranker-base"
+
+    # Chunks a search returns: the ones sent to the LLM, and the ones the eval scores.
+    search_results: int = 5
 
     # Lists frontend origins allowed to call API from browser
     cors_origins: list[str] = ["http://localhost:3000"]

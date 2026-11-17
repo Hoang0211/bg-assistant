@@ -14,11 +14,12 @@ from app.db.models import Base
 config = context.config
 # Use the URL a caller passed in (the test fixture does), otherwise the app's settings.
 if not config.get_main_option("sqlalchemy.url"):
-    config.set_main_option("sqlalchemy.url", get_settings().database_url)
+    # Alembic's config reads % as the start of a variable, so the URL's %-escapes are doubled.
+    config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-if config.config_file_name is not None:
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Autogenerate compares these models with the database to write migrations.

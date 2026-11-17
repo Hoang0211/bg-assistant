@@ -1,0 +1,414 @@
+{
+  "about": "Golden questions for the retrieval eval, written from the rulebook PDFs before looking at any retrieval results. game is the game the question is asked about. expected lists where the answer is printed: each rulebook file with its PDF page numbers; a retrieved chunk from one of those rulebooks that overlaps one of its pages is a hit. answer is a short paraphrase, for checking by hand and for the answer judge in milestone 6. The PDFs are not committed: each file is matched to a rulebook with that filename in the library.",
+  "tags": {
+    "picture-text": "the answer is inside a picture region; the PDF may have it as text, but Docling skips text inside pictures",
+    "ocr": "the page is a scanned image with no text layer, so all its text comes from OCR",
+    "table": "the answer is in a table",
+    "callout": "the answer is in a box under a generic heading (Important, Example, Step 2)",
+    "short-section": "the answer is a short section that the chunker merges into a neighbour",
+    "multi-page": "the answer is printed in more than one place (pages or rulebooks); any of them counts",
+    "reworded": "the question shares few words with the rulebook text",
+    "expansion": "the answer is in an expansion rulebook",
+    "expansion-dependent": "the answer changes with an expansion, so the agent should ask which expansions are in play"
+  },
+  "questions": [
+    {
+      "id": "ssp-01",
+      "game": "Sea Salt & Paper",
+      "question": "What are my options for getting a new card on my turn?",
+      "expected": [
+        {
+          "file": "SSAP_EN.pdf",
+          "pages": [1]
+        }
+      ],
+      "answer": "Draw the top two cards of the deck, keep one and discard the other face up on a discard pile of your choice; or take the top card of either discard pile.",
+      "tags": []
+    },
+    {
+      "id": "ssp-02",
+      "game": "Sea Salt & Paper",
+      "question": "How many points do you need to win a three-player game?",
+      "expected": [
+        {
+          "file": "SSAP_EN.pdf",
+          "pages": [1]
+        }
+      ],
+      "answer": "35 (40 with two players, 30 with four).",
+      "tags": []
+    },
+    {
+      "id": "ssp-03",
+      "game": "Sea Salt & Paper",
+      "question": "I ended the round with Last Chance but another player had more points than me. What does everyone score?",
+      "expected": [
+        {
+          "file": "SSAP_EN.pdf",
+          "pages": [1]
+        }
+      ],
+      "answer": "The bet is lost, so the player who called it scores only their colour bonus, and the others score the points on their cards.",
+      "tags": []
+    },
+    {
+      "id": "ssp-04",
+      "game": "Sea Salt & Paper",
+      "question": "Is there a way to win the whole game instantly?",
+      "expected": [
+        {
+          "file": "SSAP_EN.pdf",
+          "pages": [1]
+        },
+        {
+          "file": "SSAP_EXTRA_PEPPER_EN.pdf",
+          "pages": [1]
+        }
+      ],
+      "answer": "Yes, by placing all 4 mermaid cards in front of you; while Extra Pepper's Dance of the Mermaids event applies to you, 3 are enough (an event applies to everyone in the round it's revealed, then only to the player who holds it).",
+      "tags": ["reworded", "multi-page", "expansion-dependent"]
+    },
+    {
+      "id": "ssp-05",
+      "game": "Sea Salt & Paper",
+      "question": "How many points are three octopus cards worth?",
+      "expected": [
+        {
+          "file": "SSAP_EN.pdf",
+          "pages": [1]
+        },
+        {
+          "file": "SSAP_EXTRA_PEPPER_EN.pdf",
+          "pages": [1]
+        }
+      ],
+      "answer": "6 points (1/2/3/4/5 octopus score 0/3/6/9/12); while Extra Pepper's Kraken event applies to you, each octopus scores 1, so 3 points (an event applies to everyone in the round it's revealed, then only to the player who holds it).",
+      "tags": ["multi-page", "expansion-dependent"]
+    },
+    {
+      "id": "salt-01",
+      "game": "Extra Salt",
+      "question": "What happens when someone plays a swimmer together with a jellyfish?",
+      "expected": [
+        {
+          "file": "SSAP_EXTRA_SALT_EN.pdf",
+          "pages": [2]
+        }
+      ],
+      "answer": "On their next turn, the opponents may only draw the top card of the deck; they can't play cards or end the round.",
+      "tags": ["expansion"]
+    },
+    {
+      "id": "salt-02",
+      "game": "Extra Salt",
+      "question": "Can the seahorse count as the shell I'm missing from my collection?",
+      "expected": [
+        {
+          "file": "SSAP_EXTRA_SALT_EN.pdf",
+          "pages": [3]
+        }
+      ],
+      "answer": "Yes; it replaces a missing collector card if you already have at least one card of that collection, and can't score more than that collection's maximum.",
+      "tags": ["expansion", "reworded"]
+    },
+    {
+      "id": "salt-03",
+      "game": "Extra Salt",
+      "question": "With Extra Salt shuffled into the base game, how many orange cards are in the deck?",
+      "expected": [
+        {
+          "file": "SSAP_EXTRA_SALT_EN.pdf",
+          "pages": [4]
+        }
+      ],
+      "answer": "1 (the colour legend lists each colour's card count for the base game and Extra Salt together, with its ColorADD symbol).",
+      "tags": ["expansion", "picture-text"]
+    },
+    {
+      "id": "pepper-01",
+      "game": "Extra Pepper",
+      "question": "Which event raises the number of points I need before I can end a round?",
+      "expected": [
+        {
+          "file": "SSAP_EXTRA_PEPPER_EN.pdf",
+          "pages": [1]
+        }
+      ],
+      "answer": "The Treasure Chest; a player needs 10 points instead of 7 to end the round.",
+      "tags": ["expansion"]
+    },
+    {
+      "id": "pepper-02",
+      "game": "Extra Pepper",
+      "question": "Can I have two event cards in front of me at the same time?",
+      "expected": [
+        {
+          "file": "SSAP_EXTRA_PEPPER_EN.pdf",
+          "pages": [1]
+        }
+      ],
+      "answer": "No; at most one, so when you'd get a second you choose which one to keep.",
+      "tags": ["expansion"]
+    },
+    {
+      "id": "rebel-01",
+      "game": "Rebel Princess",
+      "question": "Which cards do I take out of the deck for a three-player game?",
+      "expected": [
+        {
+          "file": "Rebel_Princess_Deluxe_Edition_EN.pdf",
+          "pages": [4]
+        }
+      ],
+      "answer": "Remove the 1s, 11s and 12s (with 4 or 5 players remove the 11s and 12s; with 6, use every suited card).",
+      "tags": ["ocr"]
+    },
+    {
+      "id": "rebel-02",
+      "game": "Rebel Princess",
+      "question": "Am I allowed to lead a trick with a Prince?",
+      "expected": [
+        {
+          "file": "Rebel_Princess_Deluxe_Edition_EN.pdf",
+          "pages": [9]
+        }
+      ],
+      "answer": "Not at first; only after a player who is void in the led suit has played a Prince (the Frog doesn't count), or if your hand holds only Princes.",
+      "tags": ["ocr"]
+    },
+    {
+      "id": "rebel-03",
+      "game": "Rebel Princess",
+      "question": "How bad is it to end the round holding the Frog?",
+      "expected": [
+        {
+          "file": "Rebel_Princess_Deluxe_Edition_EN.pdf",
+          "pages": [11]
+        }
+      ],
+      "answer": "The Frog (Pets 8) is worth 5 marriage proposals; each Prince is worth 1.",
+      "tags": ["ocr", "reworded"]
+    },
+    {
+      "id": "rebel-04",
+      "game": "Rebel Princess",
+      "question": "Who wins at the end, and how is a tie broken?",
+      "expected": [
+        {
+          "file": "Rebel_Princess_Deluxe_Edition_EN.pdf",
+          "pages": [13]
+        }
+      ],
+      "answer": "The player with the fewest proposals after 5 rounds; ties go to the player who scored zero or fewer in the most rounds, then to an extra round with a random black-hourglass Round card.",
+      "tags": ["ocr"]
+    },
+    {
+      "id": "rebel-05",
+      "game": "Rebel Princess",
+      "question": "If a Princess power contradicts the Round card, which one applies?",
+      "expected": [
+        {
+          "file": "Rebel_Princess_Deluxe_Edition_EN.pdf",
+          "pages": [14]
+        }
+      ],
+      "answer": "The Princess power; the order is Princess powers, then Round card effects, then the basic rules.",
+      "tags": ["ocr", "callout"]
+    },
+    {
+      "id": "splendor-01",
+      "game": "Splendor",
+      "question": "How do I set up the tokens and nobles for a two-player game?",
+      "expected": [
+        {
+          "file": "Splendor_EN.pdf",
+          "pages": [2]
+        }
+      ],
+      "answer": "Return 3 pieces of each gem colour to the box (4 of each left), keep all the gold, and reveal 3 Noble tiles.",
+      "tags": ["reworded"]
+    },
+    {
+      "id": "splendor-02",
+      "game": "Splendor",
+      "question": "When can I take two gems of the same colour?",
+      "expected": [
+        {
+          "file": "Splendor_EN.pdf",
+          "pages": [2]
+        }
+      ],
+      "answer": "Only when at least 4 pieces of that colour are in the supply before you take them.",
+      "tags": []
+    },
+    {
+      "id": "splendor-03",
+      "game": "Splendor",
+      "question": "Is there a limit to how many tokens I can hold?",
+      "expected": [
+        {
+          "file": "Splendor_EN.pdf",
+          "pages": [2]
+        }
+      ],
+      "answer": "10 at the end of your turn; with more, return pieces of your choice to the supply until you have 10.",
+      "tags": ["reworded"]
+    },
+    {
+      "id": "splendor-04",
+      "game": "Splendor",
+      "question": "What happens to the empty spot after a card is bought from the table?",
+      "expected": [
+        {
+          "file": "Splendor_EN.pdf",
+          "pages": [2]
+        }
+      ],
+      "answer": "It is refilled straight away from that level's deck, so there are always 4 face-up cards of each level unless that deck runs out.",
+      "tags": ["reworded"]
+    },
+    {
+      "id": "splendor-05",
+      "game": "Splendor",
+      "question": "Two players finish with the same number of prestige points. Who wins?",
+      "expected": [
+        {
+          "file": "Splendor_EN.pdf",
+          "pages": [2]
+        }
+      ],
+      "answer": "The one who bought fewer development cards; if still tied, they share the victory.",
+      "tags": []
+    },
+    {
+      "id": "catan-01",
+      "game": "Catan",
+      "question": "A 7 was rolled and I have 9 resource cards. How many do I lose?",
+      "expected": [
+        {
+          "file": "Catan_EN.pdf",
+          "pages": [5, 11]
+        }
+      ],
+      "answer": "4; anyone with more than 7 cards discards half, rounded down.",
+      "tags": ["multi-page"]
+    },
+    {
+      "id": "catan-02",
+      "game": "Catan",
+      "question": "Can I use a development card on the same turn I bought it?",
+      "expected": [
+        {
+          "file": "Catan_EN.pdf",
+          "pages": [5, 7]
+        }
+      ],
+      "answer": "No, except a victory point card that brings you to 10 points; you can play only one development card per turn, at any time, even before rolling.",
+      "tags": ["multi-page"]
+    },
+    {
+      "id": "catan-03",
+      "game": "Catan",
+      "question": "How likely is it that an 8 gets rolled?",
+      "expected": [
+        {
+          "file": "Catan_EN.pdf",
+          "pages": [3]
+        }
+      ],
+      "answer": "About 14% (6 and 8 are each 14%; 7 is 17%).",
+      "tags": ["picture-text", "reworded"]
+    },
+    {
+      "id": "catan-04",
+      "game": "Catan",
+      "question": "My settlement is on the ore harbor. Can I trade 3 wool there for one card?",
+      "expected": [
+        {
+          "file": "Catan_EN.pdf",
+          "pages": [9]
+        }
+      ],
+      "answer": "No; a special harbor gives 2:1 only for its own resource, and no better rate (not even 3:1) for others, so wool trades at 4:1 unless the player also has a generic 3:1 harbor.",
+      "tags": []
+    },
+    {
+      "id": "catan-05",
+      "game": "Catan",
+      "question": "Where does the robber begin the game?",
+      "expected": [
+        {
+          "file": "Catan_EN.pdf",
+          "pages": [7, 11, 12]
+        }
+      ],
+      "answer": "On the desert, the only hex that produces nothing.",
+      "tags": ["short-section", "multi-page"]
+    },
+    {
+      "id": "powergrid-01",
+      "game": "Power Grid",
+      "question": "What is the goal of Power Grid?",
+      "expected": [
+        {
+          "file": "Power_Grid_EN.pdf",
+          "pages": [2, 7]
+        }
+      ],
+      "answer": "Build a network of cities and power them; the player who can supply electricity to the most cities at the end wins.",
+      "tags": ["short-section", "multi-page"]
+    },
+    {
+      "id": "powergrid-02",
+      "game": "Power Grid",
+      "question": "How many power plants can I own, and what if I buy another one?",
+      "expected": [
+        {
+          "file": "Power_Grid_EN.pdf",
+          "pages": [3, 7]
+        }
+      ],
+      "answer": "At most 3 (4 in a two-player game, from the player-count table on p. 7); buying one more means discarding one, moving its resources to matching plants that have room or returning them to the supply.",
+      "tags": ["table", "multi-page"]
+    },
+    {
+      "id": "powergrid-03",
+      "game": "Power Grid",
+      "question": "Two players have the same number of cities. Who goes first?",
+      "expected": [
+        {
+          "file": "Power_Grid_EN.pdf",
+          "pages": [3]
+        }
+      ],
+      "answer": "The one with the largest-numbered power plant.",
+      "tags": ["reworded"]
+    },
+    {
+      "id": "powergrid-04",
+      "game": "Power Grid",
+      "question": "When does the game end and how are ties broken?",
+      "expected": [
+        {
+          "file": "Power_Grid_EN.pdf",
+          "pages": [7]
+        }
+      ],
+      "answer": "Right after phase 4 once a player has the end-game number of cities (21 / 17 / 17 / 15 / 14 for 2 to 6 players, from the table; the text only says 17); the player who powers the most cities wins, then the most money, then the most cities.",
+      "tags": ["table"]
+    },
+    {
+      "id": "powergrid-05",
+      "game": "Power Grid",
+      "question": "When does Step 2 start and what changes?",
+      "expected": [
+        {
+          "file": "Power_Grid_EN.pdf",
+          "pages": [6, 7]
+        }
+      ],
+      "answer": "Before bureaucracy in the round a player reaches the Step 2 number of cities (7; 10 with 2 players, 6 with 6, from the table on p. 7); the lowest power plant is removed once, and each city can now take a second house for 15 Elektro.",
+      "tags": ["callout", "table", "multi-page"]
+    }
+  ]
+}
