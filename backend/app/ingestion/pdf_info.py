@@ -29,3 +29,13 @@ def low_text_pages(path: Path, min_chars: int) -> list[int]:
             for number, page in enumerate(doc.pages(), start=1)
             if len(cast(str, page.get_text()).strip()) < min_chars
         ]
+
+
+def render_page(path: Path, page: int, long_side_px: int) -> bytes:
+    """Render one page (numbered from 1) as a PNG whose longer side is `long_side_px` pixels."""
+    with pymupdf.open(path) as doc:  # type: ignore[no-untyped-call]
+        pdf_page = doc[page - 1]
+        zoom = long_side_px / max(pdf_page.rect.width, pdf_page.rect.height)
+        matrix = pymupdf.Matrix(zoom, zoom)  # type: ignore[no-untyped-call]
+        png: bytes = pdf_page.get_pixmap(matrix=matrix).tobytes("png")
+        return png

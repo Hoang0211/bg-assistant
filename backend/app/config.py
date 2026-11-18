@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     parser_reasoning_effort: ReasoningEffort = "low"
     parser_max_output_tokens: int = 4000
 
+    # Each page is rendered so its longer side is this many pixels: enough for the densest page
+    # tried, at about 3,300 input tokens a page.
+    parser_image_px: int = 2048
+
     # Lists frontend origins allowed to call API from browser
     cors_origins: list[str] = ["http://localhost:3000"]
 

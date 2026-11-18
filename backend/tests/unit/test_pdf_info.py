@@ -4,7 +4,7 @@ import pymupdf
 import pytest
 from pymupdf import mupdf
 
-from app.ingestion.pdf_info import InvalidPdfError, low_text_pages, read_page_count
+from app.ingestion.pdf_info import InvalidPdfError, low_text_pages, read_page_count, render_page
 from tests.helpers import add_text_page, make_pdf
 
 
@@ -37,3 +37,19 @@ def test_low_text_pages_returns_the_pages_under_the_limit(tmp_path: Path) -> Non
 
     assert low_text_pages(path, min_chars=10) == [2]
     assert low_text_pages(path, min_chars=1000) == [1, 2]
+
+
+@pytest.mark.parametrize(("page", "size"), [(1, (1448, 2048)), (2, (2048, 1448))])
+def test_render_page_renders_the_page_with_its_longer_side_at_the_size(
+    tmp_path: Path, page: int, size: tuple[int, int]
+) -> None:
+    doc = pymupdf.open()  # type: ignore[no-untyped-call]
+    doc.new_page()  # A4 portrait: 595 x 842 points
+    doc.new_page(width=842, height=595)
+    path = tmp_path / "rules.pdf"
+    doc.save(path)  # type: ignore[no-untyped-call]
+
+    png = render_page(path, page, long_side_px=2048)
+    pixmap = pymupdf.Pixmap(png)  # type: ignore[no-untyped-call]
+
+    assert (pixmap.width, pixmap.height) == size

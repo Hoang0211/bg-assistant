@@ -72,6 +72,12 @@ async def test_fake_llm_provider_returns_the_replies_in_order_and_records_each_c
     ]
 
 
+async def test_fake_llm_provider_returns_a_scripted_completion_as_it_is() -> None:
+    cut_off = Completion("# Setup", complete=False, usage=Usage(3000, 0, 4000, 0))
+
+    assert await FakeLLMProvider([cut_off]).complete("model", "", [], 4000, "low") == cut_off
+
+
 async def test_fake_llm_provider_raises_when_no_reply_is_left() -> None:
     with pytest.raises(RuntimeError, match="no scripted reply"):
         await FakeLLMProvider([]).complete("model", "", [], 100, "low")
