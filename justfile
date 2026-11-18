@@ -79,6 +79,11 @@ test-frontend:
     npm run test
     npm run test:storybook
 
+# Run the tests that call OpenAI (a few cents; needs OPENAI_API_KEY in backend/.env).
+[working-directory: 'backend']
+test-live:
+    uv run --env-file .env pytest -m live --force-enable-socket
+
 # Run the Playwright end-to-end tests (starts the database first).
 [working-directory: 'frontend']
 e2e: db

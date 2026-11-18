@@ -1,7 +1,11 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.llm.base import ReasoningEffort
 
 
 class Settings(BaseSettings):
@@ -64,6 +68,19 @@ class Settings(BaseSettings):
 
     # Chunks a search returns: the ones sent to the LLM, and the ones the eval scores.
     search_results: int = 5
+
+    # "openai", or "fake" for scripted replies with no API key (tests always use it).
+    llm_provider: Literal["openai", "fake"] = "openai"
+    openai_api_key: SecretStr = SecretStr("")  # set in .env only
+
+    # Seconds before a request to the LLM is given up and retried.
+    llm_timeout_seconds: float = 120
+
+    # The vision model that writes each rulebook page as Markdown, and its reasoning effort.
+    # The output cap is a spending guard: the densest page tried needed about 1,900 tokens.
+    parser_model: str = "gpt-6.1-terra"
+    parser_reasoning_effort: ReasoningEffort = "low"
+    parser_max_output_tokens: int = 4000
 
     # Lists frontend origins allowed to call API from browser
     cors_origins: list[str] = ["http://localhost:3000"]
