@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from itertools import groupby
 
 from app.db.models import ChunkType
-from app.ingestion.elements import Element, ElementKind
+from app.ingestion.elements import PATH_SEPARATOR, Element, ElementKind
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,8 @@ def _continues(previous: Element, element: Element) -> bool:
     )
 
 
-def _join_page_breaks(elements: list[Element]) -> list[Element]:
+def join_page_breaks(elements: list[Element]) -> list[Element]:
+    """Join a paragraph to the one before it when a page break cut it in two."""
     joined: list[Element] = []
     for element in elements:
         if joined and _continues(joined[-1], element):
@@ -133,7 +134,8 @@ def _drop_credits(elements: list[Element]) -> list[Element]:
     dropping = False
     for element in elements:
         if element.kind == ElementKind.HEADING:
-            dropping = bool(_CREDITS_HEADING.fullmatch(element.text))
+            own_heading = element.text.rsplit(PATH_SEPARATOR, 1)[-1]
+            dropping = bool(_CREDITS_HEADING.fullmatch(own_heading))
         if not dropping:
             kept.append(element)
     return kept
@@ -258,7 +260,7 @@ def chunk_elements(
     elements: list[Element], count_tokens: Callable[[str], int], limits: ChunkLimits
 ) -> list[TextChunk]:
     """Split parsed elements at headings, then merge small sections and split long ones."""
-    text, tables = _pull_out_tables(_drop_credits(_join_page_breaks(elements)))
+    text, tables = _pull_out_tables(_drop_credits(join_page_breaks(elements)))
     text, entries = _pull_out_glossary(text)
     merged = _merge_small_sections(_split_at_headings(text), count_tokens, limits.min_tokens)
     sections = [

@@ -3,6 +3,9 @@
 from dataclasses import dataclass
 from enum import StrEnum
 
+# Between the headings of a section path, e.g. "Card Details › Duo cards".
+PATH_SEPARATOR = " › "
+
 
 class ElementKind(StrEnum):
     """What kind of content an element holds."""

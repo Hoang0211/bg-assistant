@@ -1403,6 +1403,25 @@ def test_chunk_elements_drops_sections_with_a_credits_heading(heading: str) -> N
     ]
 
 
+def test_chunk_elements_drops_a_credits_section_under_a_parent_heading() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Rules › Scoring", 15),
+        Element(ElementKind.PARAGRAPH, "Count your points.", 15),
+        Element(ElementKind.HEADING, "Rules › Credits", 16),
+        Element(ElementKind.PARAGRAPH, "Art by Jane Doe.", 16),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Rules › Scoring",
+            chunk_type=ChunkType.SECTION,
+            page_start=15,
+            page_end=15,
+            content="Rules › Scoring\n\nCount your points.",
+        ),
+    ]
+
+
 @pytest.mark.parametrize(
     "heading ",
     [
