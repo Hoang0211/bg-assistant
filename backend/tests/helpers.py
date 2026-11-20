@@ -1,7 +1,47 @@
+from pathlib import Path
 from typing import Any
 
 import pymupdf
 from httpx2 import AsyncClient
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from app.db.models import Rulebook
+from app.ingestion.elements import Element
+from app.ingestion.parsers import FakeParser, ParsedRulebook
+
+
+class FailingParser:
+    """A parser whose every parse fails with the given error."""
+
+    chunk_min_tokens = 80
+
+    def __init__(self, error: Exception) -> None:
+        self._error = error
+
+    async def parse(self, path: Path, page_count: int, markdown: str | None) -> ParsedRulebook:
+        raise self._error
+
+
+class DeletingParser(FakeParser):
+    """A fake parser that deletes the rulebook while it parses, as a DELETE request could."""
+
+    def __init__(
+        self,
+        sessionmaker: async_sessionmaker[AsyncSession],
+        rulebook_id: int,
+        elements: list[Element],
+        new_markdown: str | None = None,
+    ) -> None:
+        super().__init__(elements, new_markdown)
+        self._sessionmaker = sessionmaker
+        self._rulebook_id = rulebook_id
+
+    async def parse(self, path: Path, page_count: int, markdown: str | None) -> ParsedRulebook:
+        async with self._sessionmaker() as session:
+            await session.execute(delete(Rulebook).where(Rulebook.id == self._rulebook_id))
+            await session.commit()
+        return await super().parse(path, page_count, markdown)
 
 
 def make_pdf(pages: int, **save_options: object) -> bytes:

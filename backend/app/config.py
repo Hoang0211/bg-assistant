@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # Largest rulebook PDF accepted, in MB.
     max_upload_mb: int = 50
 
+    # Ingestion reads rulebooks with Docling, or with the vision model below ("llm").
+    pdf_parser: Literal["docling", "llm"] = "docling"
+
     # Pages with fewer characters in their text layer are parsed with OCR.
     ocr_min_page_chars: int = 100
 
@@ -42,8 +45,10 @@ class Settings(BaseSettings):
     # Off in tests, so starting the app there doesn't ingest rulebooks from the dev database.
     run_ingestion_worker: bool = True
 
-    # Sections with fewer tokens are merged into a neighbouring section.
+    # Sections with fewer tokens are merged into a neighbouring section. The LLM parser's headings
+    # are the rulebook's real section titles, so its sections are merged only when they're tiny.
     chunk_min_tokens: int = 80
+    markdown_chunk_min_tokens: int = 20
 
     # A section over the max is split into chunks of about the target size.
     chunk_target_tokens: int = 350

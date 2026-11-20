@@ -22,6 +22,7 @@ from app.evaluation.retrieval import evaluate_question
 from app.ingestion.elements import Element
 from app.ingestion.embedder import BgeEmbedder, Embedder
 from app.ingestion.parse_process import parse_in_process
+from app.ingestion.parsers import RulebookParser, create_parser
 from app.ingestion.pipeline import ingest_rulebook
 from app.log_setup import configure_logging
 from app.retrieval.reranker import BgeReranker
@@ -30,7 +31,7 @@ from app.retrieval.reranker import BgeReranker
 async def reindex(
     sessionmaker: async_sessionmaker[AsyncSession],
     upload_dir: Path,
-    parse: Callable[[Path], list[Element]],
+    parser: RulebookParser,
     embedder: Embedder,
     game_id: int | None = None,
 ) -> int:
@@ -45,7 +46,7 @@ async def reindex(
     skipped = 0
     for rulebook_id in ids:
         async with sessionmaker() as session:
-            await ingest_rulebook(session, rulebook_id, upload_dir, parse, embedder)
+            await ingest_rulebook(session, rulebook_id, upload_dir, parser, embedder)
             # A fresh query: after a failure the loaded rulebook is expired and can't lazy-load.
             row = (
                 await session.execute(
@@ -98,7 +99,7 @@ async def _reindex(settings: Settings, game_id: int | None) -> int:
         failed = await reindex(
             create_sessionmaker(engine),
             settings.upload_dir,
-            _parse(settings),
+            create_parser(settings),
             BgeEmbedder(settings.embedding_model),
             game_id,
         )
@@ -118,7 +119,7 @@ async def _eval_ingest(settings: Settings) -> int:
         failed = await reindex(
             sessionmaker,
             settings.eval_rulebooks_dir,
-            _parse(settings),
+            create_parser(settings),
             BgeEmbedder(settings.embedding_model),
         )
     finally:

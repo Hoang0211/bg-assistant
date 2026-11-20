@@ -1,6 +1,5 @@
 """Ingest a generated rulebook end to end, with the real parser, embedder and database."""
 
-from functools import partial
 from pathlib import Path
 
 import pymupdf
@@ -11,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db.models import Chunk, Game, Rulebook, RulebookStatus
 from app.ingestion.embedder import BgeEmbedder
-from app.ingestion.parse_process import parse_in_process
+from app.ingestion.parsers import DoclingParser
 from app.ingestion.pipeline import ingest_rulebook
 from tests.helpers import add_text_page
 
@@ -92,11 +91,7 @@ async def test_ingest_rulebook_chunks_each_layout_by_section(
         db_session,
         rulebook.id,
         tmp_path,
-        partial(
-            parse_in_process,
-            attempts=settings.parse_attempts,
-            timeout_seconds=settings.parse_timeout_seconds,
-        ),
+        DoclingParser(settings),
         embedder,
     )
 

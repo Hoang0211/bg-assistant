@@ -1,18 +1,18 @@
-import asyncio
 import hashlib
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.cli import _parser, reindex
 from app.db.models import Chunk, Game, Rulebook, RulebookStatus
 from app.ingestion.elements import Element, ElementKind
 from app.ingestion.embedder import FakeEmbedder
-from tests.helpers import make_pdf
+from app.ingestion.parsers import FakeParser
+from tests.helpers import DeletingParser, FailingParser, make_pdf
 
 ELEMENTS = [Element(ElementKind.HEADING, "Setup", 1), Element(ElementKind.PARAGRAPH, "Roll.", 1)]
 
@@ -48,7 +48,7 @@ async def test_reindex_ingests_every_rulebook_again(
     await _add_rulebook(db_session, tmp_path, "Catan", "catan.pdf", RulebookStatus.READY)
     await _add_rulebook(db_session, tmp_path, "Azul", "azul.pdf", RulebookStatus.FAILED)
 
-    failed = await reindex(sessionmaker, tmp_path, lambda path: ELEMENTS, FakeEmbedder())
+    failed = await reindex(sessionmaker, tmp_path, FakeParser(ELEMENTS), FakeEmbedder())
 
     statuses = (await db_session.scalars(select(Rulebook.status).order_by(Rulebook.id))).all()
     chunks = (await db_session.scalars(select(Chunk))).all()
@@ -63,15 +63,11 @@ async def test_reindex_with_a_game_ingests_only_its_rulebooks(
 ) -> None:
     catan = await _add_rulebook(db_session, tmp_path, "Catan", "catan.pdf", RulebookStatus.FAILED)
     await _add_rulebook(db_session, tmp_path, "Azul", "azul.pdf", RulebookStatus.FAILED)
-    parsed: list[str] = []
+    parser = FakeParser(ELEMENTS)
 
-    def parse(path: Path) -> list[Element]:
-        parsed.append(path.name)
-        return ELEMENTS
+    await reindex(sessionmaker, tmp_path, parser, FakeEmbedder(), game_id=catan.game_id)
 
-    await reindex(sessionmaker, tmp_path, parse, FakeEmbedder(), game_id=catan.game_id)
-
-    assert parsed == ["catan.pdf"]
+    assert [path.name for path, _ in parser.calls] == ["catan.pdf"]
 
 
 async def test_reindex_prints_why_a_rulebook_failed(
@@ -81,11 +77,9 @@ async def test_reindex_prints_why_a_rulebook_failed(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     rulebook = await _add_rulebook(db_session, tmp_path, "Catan", "catan.pdf", RulebookStatus.READY)
+    parser = FailingParser(RuntimeError("parsing failed 3 times"))
 
-    def fail(path: Path) -> list[Element]:
-        raise RuntimeError("parsing failed 3 times")
-
-    failed = await reindex(sessionmaker, tmp_path, fail, FakeEmbedder())
+    failed = await reindex(sessionmaker, tmp_path, parser, FakeEmbedder())
 
     assert failed == 1
     assert capsys.readouterr().out.splitlines() == [
@@ -101,19 +95,9 @@ async def test_reindex_skips_a_rulebook_deleted_while_it_is_ingested(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     rulebook = await _add_rulebook(db_session, tmp_path, "Catan", "catan.pdf", RulebookStatus.READY)
-    loop = asyncio.get_running_loop()
+    parser = DeletingParser(sessionmaker, rulebook.id, ELEMENTS)
 
-    async def delete_rulebook() -> None:
-        async with sessionmaker() as session:
-            await session.execute(delete(Rulebook).where(Rulebook.id == rulebook.id))
-            await session.commit()
-
-    def parse(path: Path) -> list[Element]:
-        # The parse runs in a worker thread, so the delete is sent to the event loop to run.
-        asyncio.run_coroutine_threadsafe(delete_rulebook(), loop).result()
-        return ELEMENTS
-
-    failed = await reindex(sessionmaker, tmp_path, parse, FakeEmbedder())
+    failed = await reindex(sessionmaker, tmp_path, parser, FakeEmbedder())
 
     assert failed == 0
     assert capsys.readouterr().out.splitlines() == [

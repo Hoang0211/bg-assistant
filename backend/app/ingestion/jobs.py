@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db.models import Rulebook, RulebookStatus
-from app.ingestion.elements import Element
 from app.ingestion.embedder import Embedder
+from app.ingestion.parsers import RulebookParser
 from app.ingestion.pipeline import ingest_rulebook, mark_failed
 
 logger = logging.getLogger(__name__)
@@ -21,12 +21,12 @@ class IngestionWorker:
         self,
         sessionmaker: async_sessionmaker[AsyncSession],
         upload_dir: Path,
-        parse: Callable[[Path], list[Element]],
+        parser: RulebookParser,
         make_embedder: Callable[[], Embedder],
     ) -> None:
         self._sessionmaker = sessionmaker
         self._upload_dir = upload_dir
-        self._parse = parse
+        self._parser = parser
         self._make_embedder = make_embedder
         # Created on the first job, so starting the app doesn't wait for the model to load.
         self._embedder: Embedder | None = None
@@ -71,5 +71,5 @@ class IngestionWorker:
                     await mark_failed(session, rulebook_id, error)
                     raise
             await ingest_rulebook(
-                session, rulebook_id, self._upload_dir, self._parse, self._embedder
+                session, rulebook_id, self._upload_dir, self._parser, self._embedder
             )

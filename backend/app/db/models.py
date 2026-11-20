@@ -126,6 +126,9 @@ class Rulebook(Base):
     error: Mapped[str | None] = mapped_column(Text)
     parse_report: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
+    # The LLM parser's Markdown, kept so parsing again doesn't pay for the model again.
+    markdown: Mapped[str | None] = mapped_column(Text)
+
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 

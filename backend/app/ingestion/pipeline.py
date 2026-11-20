@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import time
-from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
 
@@ -13,28 +12,25 @@ from app.db.models import Chunk, Rulebook, RulebookStatus
 from app.ingestion.chunker import ChunkLimits, TextChunk, chunk_elements
 from app.ingestion.elements import Element
 from app.ingestion.embedder import Embedder
-from app.ingestion.pdf_info import low_text_pages
-from app.ingestion.quality import ParseReport, build_report
+from app.ingestion.parsers import RulebookParser
+from app.ingestion.quality import build_report
 
 logger = logging.getLogger(__name__)
 
 
-def _process(
-    path: Path, page_count: int, parse: Callable[[Path], list[Element]], embedder: Embedder
-) -> tuple[list[TextChunk], list[list[float]], ParseReport]:
+def _chunk_and_embed(
+    elements: list[Element], min_tokens: int, embedder: Embedder
+) -> tuple[list[TextChunk], list[list[float]]]:
     settings = get_settings()
     limits = ChunkLimits(
-        min_tokens=settings.chunk_min_tokens,
+        min_tokens=min_tokens,
         target_tokens=settings.chunk_target_tokens,
         max_tokens=settings.chunk_max_tokens,
         overlap_tokens=settings.chunk_overlap_tokens,
     )
-    elements = parse(path)
     chunks = chunk_elements(elements, embedder.count_tokens, limits)
     vectors = embedder.embed_documents([chunk.content for chunk in chunks])
-    ocr_pages = low_text_pages(path, settings.ocr_min_page_chars)
-    report = build_report(elements, len(chunks), page_count, ocr_pages)
-    return chunks, vectors, report
+    return chunks, vectors
 
 
 async def mark_failed(session: AsyncSession, rulebook_id: int, error: Exception) -> None:
@@ -50,10 +46,14 @@ async def ingest_rulebook(
     session: AsyncSession,
     rulebook_id: int,
     upload_dir: Path,
-    parse: Callable[[Path], list[Element]],
+    parser: RulebookParser,
     embedder: Embedder,
 ) -> None:
-    """Parse, chunk and embed a rulebook, replacing its chunks; any error marks it as failed."""
+    """Parse, chunk and embed a rulebook, replacing its chunks; any error marks it as failed.
+
+    New Markdown from the parser is stored as soon as the parse ends, so a later failure doesn't
+    lose it; a parse that returns none leaves the stored copy as it is.
+    """
     rulebook = await session.get(Rulebook, rulebook_id)
     if rulebook is None:
         logger.info("rulebook %d was deleted before it was ingested", rulebook_id)
@@ -71,9 +71,23 @@ async def ingest_rulebook(
     await session.commit()
 
     try:
-        chunks, vectors, report = await asyncio.to_thread(
-            _process, upload_dir / rulebook.storage_path, rulebook.page_count, parse, embedder
+        parsed = await parser.parse(
+            upload_dir / rulebook.storage_path, rulebook.page_count, rulebook.markdown
         )
+        if parsed.new_markdown is not None:
+            # An UPDATE, not the loaded rulebook, so it changes nothing if the rulebook was
+            # deleted during the parse.
+            await session.execute(
+                update(Rulebook)
+                .where(Rulebook.id == rulebook_id)
+                .values(markdown=parsed.new_markdown)
+            )
+            await session.commit()
+
+        chunks, vectors = await asyncio.to_thread(
+            _chunk_and_embed, parsed.elements, parser.chunk_min_tokens, embedder
+        )
+        report = build_report(parsed.elements, len(chunks), rulebook.page_count, parsed.ocr_pages)
         # Lock the rulebook until the commit, so a move waits and another ingestion of it can't
         # write its chunks at the same time; and read its game now, not from before the parse.
         game_id = await session.scalar(

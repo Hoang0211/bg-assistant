@@ -13,7 +13,7 @@ from app.config import get_settings
 from app.db.session import create_db_engine, create_sessionmaker
 from app.ingestion.embedder import BgeEmbedder
 from app.ingestion.jobs import IngestionWorker
-from app.ingestion.parse_process import parse_in_process
+from app.ingestion.parsers import create_parser
 from app.log_setup import configure_logging
 
 logger = logging.getLogger(__name__)
@@ -32,11 +32,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     worker = IngestionWorker(
         app.state.sessionmaker,
         settings.upload_dir,
-        partial(
-            parse_in_process,
-            attempts=settings.parse_attempts,
-            timeout_seconds=settings.parse_timeout_seconds,
-        ),
+        create_parser(settings),
         partial(BgeEmbedder, settings.embedding_model),
     )
     app.state.ingestion_worker = worker

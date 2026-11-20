@@ -9,6 +9,7 @@ from app.db.models import Game, Rulebook, RulebookStatus
 from app.ingestion.elements import Element, ElementKind
 from app.ingestion.embedder import FakeEmbedder
 from app.ingestion.jobs import IngestionWorker
+from app.ingestion.parsers import FakeParser
 from tests.helpers import make_pdf
 
 ELEMENTS = [
@@ -54,17 +55,13 @@ async def test_worker_requeues_only_unfinished_rulebooks(
         ("failed.pdf", RulebookStatus.FAILED),
     ]:
         await _add_rulebook(db_session, tmp_path, name, status)
-    parsed: list[str] = []
+    parser = FakeParser(ELEMENTS)
 
-    def parse(path: Path) -> list[Element]:
-        parsed.append(path.name)
-        return ELEMENTS
-
-    worker = IngestionWorker(sessionmaker, tmp_path, parse, FakeEmbedder)
+    worker = IngestionWorker(sessionmaker, tmp_path, parser, FakeEmbedder)
     await worker.requeue_unfinished()
     await _run_until_idle(worker)
 
-    assert parsed == ["uploaded.pdf", "processing.pdf"]
+    assert [path.name for path, _ in parser.calls] == ["uploaded.pdf", "processing.pdf"]
 
 
 async def test_worker_creates_the_embedder_once(
@@ -79,7 +76,7 @@ async def test_worker_creates_the_embedder_once(
         created.append(embedder)
         return embedder
 
-    worker = IngestionWorker(sessionmaker, tmp_path, lambda path: ELEMENTS, make_embedder)
+    worker = IngestionWorker(sessionmaker, tmp_path, FakeParser(ELEMENTS), make_embedder)
     worker.enqueue(first.id)
     worker.enqueue(second.id)
     await _run_until_idle(worker)
@@ -101,7 +98,7 @@ async def test_worker_keeps_running_after_a_job_fails(
             raise failures.pop()
         return FakeEmbedder()
 
-    worker = IngestionWorker(sessionmaker, tmp_path, lambda path: ELEMENTS, make_embedder)
+    worker = IngestionWorker(sessionmaker, tmp_path, FakeParser(ELEMENTS), make_embedder)
     worker.enqueue(first.id)
     worker.enqueue(second.id)
     await _run_until_idle(worker)
