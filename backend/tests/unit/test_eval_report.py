@@ -22,6 +22,7 @@ def test_format_report_shows_the_scores_and_each_questions_top_results() -> None
         fused_candidates=20,
         reranker_model="reranker",
         search_results=2,
+        pdf_parser="llm",
     )
     hybrid = [
         QuestionResult(
@@ -67,6 +68,7 @@ def test_format_report_shows_the_scores_and_each_questions_top_results() -> None
     assert report == (
         "# Retrieval eval: 2026-11-15 09:05\n"
         "\n"
+        "- Parser: llm\n"
         "- Hybrid search: vector 30, full text 30, RRF k = 60\n"
         "- Reranked: hybrid search's top 20, reranked by reranker\n"
         "- Embedding model: bge\n"

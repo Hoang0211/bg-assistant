@@ -166,6 +166,17 @@ async def test_ingest_rulebook_gives_the_parser_the_stored_markdown(
     assert parser.calls == [(tmp_path / "rules.pdf", MARKDOWN)]
 
 
+async def test_ingest_rulebook_with_reparse_gives_the_parser_no_stored_markdown(
+    db_session: AsyncSession, tmp_path: Path
+) -> None:
+    rulebook = await _add_rulebook(db_session, tmp_path, markdown=MARKDOWN)
+    parser = FakeParser(ELEMENTS)
+
+    await ingest_rulebook(db_session, rulebook.id, tmp_path, parser, FakeEmbedder(), reparse=True)
+
+    assert parser.calls == [(tmp_path / "rules.pdf", None)]
+
+
 async def test_ingest_rulebook_keeps_the_stored_markdown_when_the_parser_returns_none(
     db_session: AsyncSession, tmp_path: Path
 ) -> None:

@@ -16,6 +16,8 @@ from app.evaluation.library import (
 )
 from tests.helpers import make_pdf
 
+MARKDOWN = "<!-- page 1 -->\n\n# Setup\n"
+
 
 def _rulebook(tmp_path: Path, file: str, pages: int = 1) -> LibraryRulebook:
     data = make_pdf(pages)
@@ -101,6 +103,33 @@ async def test_load_library_replaces_the_games_already_there(
     await load_library(db_session, library, tmp_path)
 
     assert list(await db_session.scalars(select(Game.name))) == ["Base"]
+
+
+@pytest.mark.parametrize(("same_pdf", "markdown"), [(True, MARKDOWN), (False, None)])
+async def test_load_library_keeps_a_rulebooks_markdown_only_for_the_same_pdf(
+    db_session: AsyncSession, tmp_path: Path, same_pdf: bool, markdown: str | None
+) -> None:
+    rulebook = _rulebook(tmp_path, "base.pdf")
+    game = Game(name="Base")
+    db_session.add(game)
+    await db_session.flush()
+    # Stored by an earlier eval-ingest: from this PDF, or from another edition of it.
+    db_session.add(
+        Rulebook(
+            game_id=game.id,
+            filename="base.pdf",
+            storage_path="base.pdf",
+            page_count=1,
+            sha256=rulebook.sha256 if same_pdf else "0" * 64,
+            markdown=MARKDOWN,
+        )
+    )
+    await db_session.commit()
+    library = Library(games=[LibraryGame(name="Base", rulebooks=[rulebook], expansions=[])])
+
+    await load_library(db_session, library, tmp_path)
+
+    assert await db_session.scalar(select(Rulebook.markdown)) == markdown
 
 
 async def test_load_library_warns_when_a_file_is_another_edition(

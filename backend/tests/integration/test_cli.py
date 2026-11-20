@@ -7,7 +7,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.cli import _parser, reindex
+from app.cli import _eval_settings, _parser, reindex
+from app.config import Settings
 from app.db.models import Chunk, Game, Rulebook, RulebookStatus
 from app.ingestion.elements import Element, ElementKind
 from app.ingestion.embedder import FakeEmbedder
@@ -106,6 +107,19 @@ async def test_reindex_skips_a_rulebook_deleted_while_it_is_ingested(
     ]
 
 
+async def test_reindex_with_reparse_gives_the_parser_no_stored_markdown(
+    db_session: AsyncSession, sessionmaker: async_sessionmaker[AsyncSession], tmp_path: Path
+) -> None:
+    rulebook = await _add_rulebook(db_session, tmp_path, "Catan", "catan.pdf", RulebookStatus.READY)
+    rulebook.markdown = "<!-- page 1 -->\n\n# Setup\n"
+    await db_session.commit()
+    parser = FakeParser(ELEMENTS)
+
+    await reindex(sessionmaker, tmp_path, parser, FakeEmbedder(), reparse=True)
+
+    assert parser.calls == [(tmp_path / "catan.pdf", None)]
+
+
 def test_parser_reads_the_game_option() -> None:
     assert _parser().parse_args(["reindex", "--game", "3"]).game == 3
     assert _parser().parse_args(["reindex"]).game is None
@@ -117,6 +131,34 @@ def test_parser_reads_the_eval_ingest_command() -> None:
 
 def test_parser_reads_the_eval_command() -> None:
     assert _parser().parse_args(["eval"]).command == "eval"
+
+
+def test_parser_reads_the_reparse_option() -> None:
+    assert _parser().parse_args(["reindex", "--reparse"]).reparse is True
+    assert _parser().parse_args(["reindex"]).reparse is False
+    assert _parser().parse_args(["eval-ingest", "--reparse"]).reparse is True
+    assert _parser().parse_args(["eval-ingest"]).reparse is False
+
+
+def test_parser_reads_the_parser_option() -> None:
+    assert _parser().parse_args(["eval-ingest", "--parser", "llm"]).parser == "llm"
+    assert _parser().parse_args(["eval", "--parser", "docling"]).parser == "docling"
+    assert _parser().parse_args(["eval"]).parser is None
+
+
+def test_eval_settings_point_at_the_parsers_own_database() -> None:
+    settings = Settings(
+        database_url="postgresql+psycopg://bg:secret@localhost:5432/bg_assistant",
+        eval_database_name="bg_assistant_eval",
+        pdf_parser="docling",
+    )
+
+    eval_settings = _eval_settings(settings, "llm")
+
+    assert (eval_settings.database_url, eval_settings.pdf_parser) == (
+        "postgresql+psycopg://bg:secret@localhost:5432/bg_assistant_eval_llm",
+        "llm",
+    )
 
 
 def test_cli_runs_as_a_module() -> None:

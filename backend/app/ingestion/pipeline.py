@@ -48,11 +48,13 @@ async def ingest_rulebook(
     upload_dir: Path,
     parser: RulebookParser,
     embedder: Embedder,
+    reparse: bool = False,
 ) -> None:
     """Parse, chunk and embed a rulebook, replacing its chunks; any error marks it as failed.
 
     New Markdown from the parser is stored as soon as the parse ends, so a later failure doesn't
-    lose it; a parse that returns none leaves the stored copy as it is.
+    lose it; a parse that returns none leaves the stored copy as it is. With `reparse`, the
+    parser isn't given the stored copy, so the LLM parser reads the pages again.
     """
     rulebook = await session.get(Rulebook, rulebook_id)
     if rulebook is None:
@@ -71,9 +73,8 @@ async def ingest_rulebook(
     await session.commit()
 
     try:
-        parsed = await parser.parse(
-            upload_dir / rulebook.storage_path, rulebook.page_count, rulebook.markdown
-        )
+        stored = None if reparse else rulebook.markdown
+        parsed = await parser.parse(upload_dir / rulebook.storage_path, rulebook.page_count, stored)
         if parsed.new_markdown is not None:
             # An UPDATE, not the loaded rulebook, so it changes nothing if the rulebook was
             # deleted during the parse.

@@ -58,6 +58,7 @@ def format_report(
     lines = [
         f"# Retrieval eval: {now:%Y-%m-%d %H:%M}",
         "",
+        f"- Parser: {settings.pdf_parser}",
         f"- Hybrid search: vector {settings.vector_candidates}, full text "
         f"{settings.full_text_candidates}, RRF k = {settings.rrf_k}",
         f"- Reranked: hybrid search's top {settings.fused_candidates}, reranked by "

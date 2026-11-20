@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 from pydantic import BaseModel
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Game, Rulebook
@@ -39,7 +39,11 @@ def read_library(path: Path) -> Library:
 
 
 def _add_rulebooks(
-    session: AsyncSession, game: Game, rulebooks: list[LibraryRulebook], rulebooks_dir: Path
+    session: AsyncSession,
+    game: Game,
+    rulebooks: list[LibraryRulebook],
+    rulebooks_dir: Path,
+    markdown: dict[str, str | None],
 ) -> None:
     for entry in rulebooks:
         data = (rulebooks_dir / entry.file).read_bytes()
@@ -56,22 +60,31 @@ def _add_rulebooks(
                 storage_path=entry.file,
                 page_count=read_page_count(data),
                 sha256=sha256,
+                markdown=markdown.get(sha256),
             )
         )
 
 
 async def load_library(session: AsyncSession, library: Library, rulebooks_dir: Path) -> None:
-    """Replace every game in the database with the library's games and their rulebooks."""
+    """Replace every game in the database with the library's games and their rulebooks.
+
+    A rulebook gets back the Markdown stored for the same PDF (the same sha256), so the LLM parser
+    doesn't pay for it again; a changed or removed PDF's Markdown is dropped.
+    """
+    rows = await session.execute(
+        select(Rulebook.sha256, Rulebook.markdown).where(Rulebook.markdown.is_not(None))
+    )
+    markdown: dict[str, str | None] = {sha256: text for sha256, text in rows}
     # Deleting the games cascades to their rulebooks and chunks; the PDFs aren't touched.
     await session.execute(delete(Game))
     for entry in library.games:
         game = Game(name=entry.name)
         session.add(game)
         await session.flush()
-        _add_rulebooks(session, game, entry.rulebooks, rulebooks_dir)
+        _add_rulebooks(session, game, entry.rulebooks, rulebooks_dir, markdown)
         for expansion_entry in entry.expansions:
             expansion = Game(name=expansion_entry.name, is_expansion=True, base_game_id=game.id)
             session.add(expansion)
             await session.flush()
-            _add_rulebooks(session, expansion, expansion_entry.rulebooks, rulebooks_dir)
+            _add_rulebooks(session, expansion, expansion_entry.rulebooks, rulebooks_dir, markdown)
     await session.commit()

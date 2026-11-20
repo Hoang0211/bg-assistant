@@ -1,11 +1,10 @@
-"""Engine commands for the terminal: reindex [--game <id>], eval-ingest and eval."""
+"""Engine commands for the terminal: reindex, eval-ingest and eval."""
 
 import argparse
 import asyncio
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from datetime import datetime
-from functools import partial
 from pathlib import Path
 
 from sqlalchemy import func, select
@@ -19,9 +18,7 @@ from app.evaluation.library import load_library, read_library
 from app.evaluation.questions import read_questions
 from app.evaluation.report import format_report
 from app.evaluation.retrieval import evaluate_question
-from app.ingestion.elements import Element
 from app.ingestion.embedder import BgeEmbedder, Embedder
-from app.ingestion.parse_process import parse_in_process
 from app.ingestion.parsers import RulebookParser, create_parser
 from app.ingestion.pipeline import ingest_rulebook
 from app.log_setup import configure_logging
@@ -34,8 +31,12 @@ async def reindex(
     parser: RulebookParser,
     embedder: Embedder,
     game_id: int | None = None,
+    reparse: bool = False,
 ) -> int:
-    """Ingest the stored rulebooks again, one at a time; return how many failed."""
+    """Ingest the stored rulebooks again, one at a time; return how many failed.
+
+    With `reparse`, stored Markdown is ignored, so the LLM parser reads every page again.
+    """
     query = select(Rulebook.id).order_by(Rulebook.id)
     if game_id is not None:
         query = query.where(Rulebook.game_id == game_id)
@@ -46,7 +47,7 @@ async def reindex(
     skipped = 0
     for rulebook_id in ids:
         async with sessionmaker() as session:
-            await ingest_rulebook(session, rulebook_id, upload_dir, parser, embedder)
+            await ingest_rulebook(session, rulebook_id, upload_dir, parser, embedder, reparse)
             # A fresh query: after a failure the loaded rulebook is expired and can't lazy-load.
             row = (
                 await session.execute(
@@ -71,6 +72,11 @@ async def reindex(
     return failed
 
 
+_PARSERS = ["docling", "llm"]
+_PARSER_HELP = "the parser whose eval database to use (default: the pdf_parser setting)"
+_REPARSE_HELP = "ignore stored Markdown, so the LLM parser reads every page again (and is paid)"
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -78,22 +84,27 @@ def _parser() -> argparse.ArgumentParser:
         "reindex", help="parse, chunk and embed the stored rulebooks again"
     )
     reindex_parser.add_argument("--game", type=int, help="only this game's rulebooks")
-    commands.add_parser(
-        "eval-ingest", help="build the eval database from the eval library and ingest it"
+    reindex_parser.add_argument("--reparse", action="store_true", help=_REPARSE_HELP)
+    eval_ingest_parser = commands.add_parser(
+        "eval-ingest", help="build a parser's eval database from the eval library and ingest it"
     )
-    commands.add_parser("eval", help="search the eval database for each golden question")
+    eval_ingest_parser.add_argument("--parser", choices=_PARSERS, help=_PARSER_HELP)
+    eval_ingest_parser.add_argument("--reparse", action="store_true", help=_REPARSE_HELP)
+    eval_parser = commands.add_parser(
+        "eval", help="search a parser's eval database for each golden question"
+    )
+    eval_parser.add_argument("--parser", choices=_PARSERS, help=_PARSER_HELP)
     return parser
 
 
-def _parse(settings: Settings) -> Callable[[Path], list[Element]]:
-    return partial(
-        parse_in_process,
-        attempts=settings.parse_attempts,
-        timeout_seconds=settings.parse_timeout_seconds,
-    )
+def _eval_settings(settings: Settings, pdf_parser: str) -> Settings:
+    """The settings for one parser's eval database, on the same server as the dev database."""
+    name = f"{settings.eval_database_name}_{pdf_parser}"
+    url = eval_database_url(settings.database_url, name)
+    return settings.model_copy(update={"database_url": url, "pdf_parser": pdf_parser})
 
 
-async def _reindex(settings: Settings, game_id: int | None) -> int:
+async def _reindex(settings: Settings, game_id: int | None, reparse: bool) -> int:
     engine = create_db_engine(settings)
     try:
         failed = await reindex(
@@ -102,13 +113,14 @@ async def _reindex(settings: Settings, game_id: int | None) -> int:
             create_parser(settings),
             BgeEmbedder(settings.embedding_model),
             game_id,
+            reparse,
         )
     finally:
         await engine.dispose()
     return 1 if failed else 0
 
 
-async def _eval_ingest(settings: Settings) -> int:
+async def _eval_ingest(settings: Settings, reparse: bool) -> int:
     """Replace the eval database's games with the eval library and ingest its rulebooks."""
     engine = create_db_engine(settings)
     try:
@@ -121,6 +133,7 @@ async def _eval_ingest(settings: Settings) -> int:
             settings.eval_rulebooks_dir,
             create_parser(settings),
             BgeEmbedder(settings.embedding_model),
+            reparse=reparse,
         )
     finally:
         await engine.dispose()
@@ -161,21 +174,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     configure_logging()
     args = _parser().parse_args(argv)
     settings = get_settings()
-    # The eval commands work on their own database, on the same server.
-    eval_url = eval_database_url(settings.database_url, settings.eval_database_name)
-    eval_settings = settings.model_copy(update={"database_url": eval_url})
     # Async psycopg on Windows needs the selector event loop.
     loop_factory = asyncio.SelectorEventLoop if sys.platform == "win32" else None
+    if args.command == "reindex":
+        return asyncio.run(_reindex(settings, args.game, args.reparse), loop_factory=loop_factory)
+
+    # Each parser's chunks are evaluated in their own database, so both stay ready to compare.
+    eval_settings = _eval_settings(settings, args.parser or settings.pdf_parser)
     if args.command == "eval-ingest":
         # Alembic runs its own event loop, so the database is made ready before ours starts.
-        create_database_if_missing(eval_url)
-        migrate(eval_url)
-        return asyncio.run(_eval_ingest(eval_settings), loop_factory=loop_factory)
+        create_database_if_missing(eval_settings.database_url)
+        migrate(eval_settings.database_url)
+        return asyncio.run(_eval_ingest(eval_settings, args.reparse), loop_factory=loop_factory)
 
-    if args.command == "eval":
-        return asyncio.run(_eval(eval_settings), loop_factory=loop_factory)
-
-    return asyncio.run(_reindex(settings, args.game), loop_factory=loop_factory)
+    return asyncio.run(_eval(eval_settings), loop_factory=loop_factory)
 
 
 if __name__ == "__main__":

@@ -109,17 +109,20 @@ download-models:
 
 # --- Engine ---
 
-# Parse, chunk and embed the stored rulebooks again: `just reindex`, or `just reindex --game 3`.
+# Parse, chunk and embed the stored rulebooks again: `just reindex`, `just reindex --game 3`;
+# `--reparse` makes the LLM parser read the pages again instead of using the stored Markdown.
 [working-directory: 'backend']
 reindex *args:
     uv run python -m app.cli reindex {{args}}
 
-# Build the eval database from backend/eval/library.json and ingest its rulebooks (about 10 minutes).
+# Build a parser's eval database from backend/eval/library.json and ingest its rulebooks:
+# `just eval-ingest --parser llm` (Docling takes about 10 minutes; `--reparse` pays the LLM again).
 [working-directory: 'backend']
-eval-ingest:
-    uv run python -m app.cli eval-ingest
+eval-ingest *args:
+    uv run python -m app.cli eval-ingest {{args}}
 
-# Search the eval database for each golden question and write a report to backend/eval/reports/.
+# Search a parser's eval database for each golden question and write a report to
+# backend/eval/reports/: `just eval --parser llm`.
 [working-directory: 'backend']
-eval:
-    uv run python -m app.cli eval
+eval *args:
+    uv run python -m app.cli eval {{args}}
