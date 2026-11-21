@@ -146,6 +146,16 @@ def test_parser_reads_the_parser_option() -> None:
     assert _parser().parse_args(["eval"]).parser is None
 
 
+def test_parser_reads_the_compare_option() -> None:
+    assert _parser().parse_args(["eval", "--compare"]).compare is True
+    assert _parser().parse_args(["eval"]).compare is False
+
+
+def test_parser_rejects_compare_with_a_parser() -> None:
+    with pytest.raises(SystemExit):
+        _parser().parse_args(["eval", "--compare", "--parser", "llm"])
+
+
 def test_eval_settings_point_at_the_parsers_own_database() -> None:
     settings = Settings(
         database_url="postgresql+psycopg://bg:secret@localhost:5432/bg_assistant",

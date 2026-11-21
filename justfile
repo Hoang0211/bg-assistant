@@ -122,7 +122,7 @@ eval-ingest *args:
     uv run python -m app.cli eval-ingest {{args}}
 
 # Search a parser's eval database for each golden question and write a report to
-# backend/eval/reports/: `just eval --parser llm`.
+# backend/eval/reports/: `just eval --parser llm`, or `just eval --compare` for both side by side.
 [working-directory: 'backend']
 eval *args:
     uv run python -m app.cli eval {{args}}

@@ -16,13 +16,13 @@ from app.db.session import create_db_engine, create_sessionmaker
 from app.evaluation.database import create_database_if_missing, eval_database_url, migrate
 from app.evaluation.library import load_library, read_library
 from app.evaluation.questions import read_questions
-from app.evaluation.report import format_report
+from app.evaluation.report import ParserResults, format_comparison, format_report
 from app.evaluation.retrieval import evaluate_question
 from app.ingestion.embedder import BgeEmbedder, Embedder
 from app.ingestion.parsers import RulebookParser, create_parser
 from app.ingestion.pipeline import ingest_rulebook
 from app.log_setup import configure_logging
-from app.retrieval.reranker import BgeReranker
+from app.retrieval.reranker import BgeReranker, Reranker
 
 
 async def reindex(
@@ -93,7 +93,11 @@ def _parser() -> argparse.ArgumentParser:
     eval_parser = commands.add_parser(
         "eval", help="search a parser's eval database for each golden question"
     )
-    eval_parser.add_argument("--parser", choices=_PARSERS, help=_PARSER_HELP)
+    eval_options = eval_parser.add_mutually_exclusive_group()
+    eval_options.add_argument("--parser", choices=_PARSERS, help=_PARSER_HELP)
+    eval_options.add_argument(
+        "--compare", action="store_true", help="score every parser's database, side by side"
+    )
     return parser
 
 
@@ -140,11 +144,11 @@ async def _eval_ingest(settings: Settings, reparse: bool) -> int:
     return 1 if failed else 0
 
 
-async def _eval(settings: Settings) -> int:
-    """Score each golden question's search results, without and with reranking; write the report."""
+async def _search_parser(
+    settings: Settings, embedder: Embedder, reranker: Reranker
+) -> ParserResults:
+    """Search one parser's eval database for each golden question, without and with reranking."""
     questions = read_questions(settings.eval_dir / "golden_questions.json")
-    embedder = BgeEmbedder(settings.embedding_model)
-    reranker = BgeReranker(settings.reranker_model)
     engine = create_db_engine(settings)
     try:
         async with create_sessionmaker(engine)() as session:
@@ -161,12 +165,38 @@ async def _eval(settings: Settings) -> int:
             chunk_count = await session.scalar(select(func.count()).select_from(Chunk))
     finally:
         await engine.dispose()
-    now = datetime.now()
-    path = settings.eval_dir / "reports" / f"{now:%Y-%m-%d-%H%M}-retrieval.md"
+    return ParserResults(settings.pdf_parser, chunk_count or 0, hybrid, reranked)
+
+
+def _write_report(settings: Settings, name: str, report: str) -> None:
+    path = settings.eval_dir / "reports" / name
     path.parent.mkdir(exist_ok=True)
-    report = format_report(hybrid, reranked, settings, chunk_count or 0, now)
     path.write_text(report, encoding="utf-8")
     print(f"wrote {path}")
+
+
+async def _eval(settings: Settings) -> int:
+    """Score each golden question's search results, without and with reranking; write the report."""
+    embedder = BgeEmbedder(settings.embedding_model)
+    reranker = BgeReranker(settings.reranker_model)
+    results = await _search_parser(settings, embedder, reranker)
+    now = datetime.now()
+    report = format_report(results, settings, now)
+    _write_report(settings, f"{now:%Y-%m-%d-%H%M}-retrieval.md", report)
+    return 0
+
+
+async def _compare(settings: Settings) -> int:
+    """Score each parser's eval database the same way and write them side by side."""
+    embedder = BgeEmbedder(settings.embedding_model)
+    reranker = BgeReranker(settings.reranker_model)
+    first, second = [
+        await _search_parser(_eval_settings(settings, parser), embedder, reranker)
+        for parser in _PARSERS
+    ]
+    now = datetime.now()
+    report = format_comparison(first, second, settings, now)
+    _write_report(settings, f"{now:%Y-%m-%d-%H%M}-comparison.md", report)
     return 0
 
 
@@ -178,6 +208,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     loop_factory = asyncio.SelectorEventLoop if sys.platform == "win32" else None
     if args.command == "reindex":
         return asyncio.run(_reindex(settings, args.game, args.reparse), loop_factory=loop_factory)
+
+    if args.command == "eval" and args.compare:
+        return asyncio.run(_compare(settings), loop_factory=loop_factory)
 
     # Each parser's chunks are evaluated in their own database, so both stay ready to compare.
     eval_settings = _eval_settings(settings, args.parser or settings.pdf_parser)
