@@ -1,3 +1,5 @@
+import pytest
+
 from app.db.models import ChunkType
 from app.ingestion.chunker import ChunkLimits, TextChunk, chunk_elements
 from app.ingestion.elements import Element, ElementKind
@@ -71,6 +73,19 @@ def test_markdown_to_elements_keeps_a_blockquote_as_a_paragraph() -> None:
             ElementKind.PARAGRAPH, "> **Example:** Anna rolls a 7.\n>\n> She moves the robber.", 1
         )
     ]
+
+
+def test_markdown_to_elements_reads_a_bold_line_as_a_caption() -> None:
+    assert markdown_to_elements("**Odds for Dice Rolls**\n") == [
+        Element(ElementKind.CAPTION, "**Odds for Dice Rolls**", 1)
+    ]
+
+
+@pytest.mark.parametrize(
+    "text", ["**Example:** Anna rolls a 7.", "**Roads** and **cities**", "**Setup**\n**Trading**"]
+)
+def test_markdown_to_elements_keeps_a_partly_bold_block_as_a_paragraph(text: str) -> None:
+    assert markdown_to_elements(f"{text}\n") == [Element(ElementKind.PARAGRAPH, text, 1)]
 
 
 def test_markdown_to_elements_continues_the_section_on_a_page_with_no_heading() -> None:
@@ -164,4 +179,19 @@ def test_markdown_to_elements_gives_the_chunker_one_chunk_per_page_of_a_section(
             page_end=4,
             content="Setup › Market\n\nShuffle the cards.",
         ),
+    ]
+
+
+def test_markdown_to_elements_gives_the_chunker_a_tables_caption() -> None:
+    markdown = (
+        "## Setup\n\nPlace the board.\n\n**Odds for Dice Rolls**\n\n"
+        "| Roll | Odds |\n|---|---|\n| 6 & 8 | 14% |\n"
+    )
+    limits = ChunkLimits(min_tokens=0, target_tokens=1000, max_tokens=1000, overlap_tokens=0)
+
+    chunks = chunk_elements(markdown_to_elements(markdown), lambda text: len(text.split()), limits)
+
+    assert [chunk.content for chunk in chunks] == [
+        "Setup\n\nPlace the board.",
+        "Setup\n\n**Odds for Dice Rolls**\n\n| Roll | Odds |\n|---|---|\n| 6 & 8 | 14% |",
     ]

@@ -895,6 +895,129 @@ def test_chunk_elements_splits_a_long_table_row_between_words() -> None:
     ]
 
 
+def test_chunk_elements_puts_a_caption_right_above_a_table_in_its_chunk() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Costs", 3),
+        Element(ElementKind.PARAGRAPH, "Pay first.", 3),
+        Element(ElementKind.CAPTION, "Building costs", 3),
+        Element(ElementKind.TABLE, TABLE, 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.SECTION,
+            page_start=3,
+            page_end=3,
+            content="Costs\n\nPay first.",
+        ),
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\nBuilding costs\n\n{TABLE}",
+        ),
+    ]
+
+
+def test_chunk_elements_puts_a_caption_in_a_table_chunk_with_no_heading() -> None:
+    elements = [
+        Element(ElementKind.CAPTION, "Building costs", 3),
+        Element(ElementKind.TABLE, TABLE, 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Building costs\n\n{TABLE}",
+        ),
+    ]
+
+
+def test_chunk_elements_repeats_a_tables_caption_in_each_piece() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Costs", 3),
+        Element(ElementKind.CAPTION, "Building costs", 3),
+        Element(
+            ElementKind.TABLE,
+            f"{HEADER}\n| Road | Brick |\n| City | Ore |\n| Farm | Wool |\n| Port | Clay |",
+            3,
+        ),
+    ]
+
+    assert chunk_elements(elements, count_words, limits(target_tokens=19, max_tokens=19)) == [
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\nBuilding costs\n\n{HEADER}\n| Road | Brick |\n| City | Ore |",
+        ),
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\nBuilding costs\n\n{HEADER}\n| Farm | Wool |\n| Port | Clay |",
+        ),
+    ]
+
+
+def test_chunk_elements_keeps_a_caption_on_an_earlier_page_in_its_section() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Costs", 2),
+        Element(ElementKind.CAPTION, "Building costs", 2),
+        Element(ElementKind.TABLE, TABLE, 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.SECTION,
+            page_start=2,
+            page_end=2,
+            content="Costs\n\nBuilding costs",
+        ),
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\n{TABLE}",
+        ),
+    ]
+
+
+def test_chunk_elements_keeps_a_caption_with_text_below_it_in_its_section() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Costs", 3),
+        Element(ElementKind.CAPTION, "Building costs", 3),
+        Element(ElementKind.PARAGRAPH, "Pay first.", 3),
+        Element(ElementKind.TABLE, TABLE, 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.SECTION,
+            page_start=3,
+            page_end=3,
+            content="Costs\n\nBuilding costs\n\nPay first.",
+        ),
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\n{TABLE}",
+        ),
+    ]
+
+
 def test_chunk_elements_puts_each_glossary_entry_in_its_own_chunk() -> None:
     elements = [
         Element(ElementKind.HEADING, "Cards", 18),

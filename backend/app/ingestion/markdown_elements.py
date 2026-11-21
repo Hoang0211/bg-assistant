@@ -8,6 +8,8 @@ from app.ingestion.elements import PATH_SEPARATOR, Element, ElementKind
 _PAGE_MARKER = re.compile(r"<!-- page (\d+) -->")
 _HEADING = re.compile(r"(#{1,6}) +(.+)")
 _LIST_ITEM = re.compile(r"(?:[-*+]|\d+[.)]) ")
+# A line that's all bold: the parser writes captions and box titles this way.
+_CAPTION = re.compile(r"\*\*[^*]+\*\*")
 
 
 def _blocks(markdown: str) -> list[str]:
@@ -56,6 +58,8 @@ def _read_blocks(markdown: str) -> list[Element]:
             elements.extend(
                 Element(ElementKind.LIST_ITEM, item, page) for item in _list_items(block)
             )
+        elif _CAPTION.fullmatch(block):
+            elements.append(Element(ElementKind.CAPTION, block, page))
         else:
             elements.append(Element(ElementKind.PARAGRAPH, block, page))
     return elements
@@ -76,8 +80,9 @@ def _continue_sections(elements: list[Element]) -> list[Element]:
 def markdown_to_elements(markdown: str) -> list[Element]:
     """Read Markdown with `<!-- page N -->` lines into elements, in order.
 
-    A heading's text is its section path, built from the heading levels. A page that doesn't
-    start with a heading continues the previous page's section, under a repeat of its path, so
-    no chunk spans a page break; only a sentence cut by the break is joined across it.
+    A heading's text is its section path, built from the heading levels, and a line that's all
+    bold is a caption. A page that doesn't start with a heading continues the previous page's
+    section, under a repeat of its path, so no chunk spans a page break; only a sentence cut by
+    the break is joined across it.
     """
     return _continue_sections(join_page_breaks(_read_blocks(markdown)))
