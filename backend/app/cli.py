@@ -1,4 +1,4 @@
-"""Engine commands for the terminal: reindex, eval-ingest and eval."""
+"""Engine commands for the terminal: reindex, eval-ingest, eval and eval-text."""
 
 import argparse
 import asyncio
@@ -18,6 +18,12 @@ from app.evaluation.library import load_library, read_library
 from app.evaluation.questions import read_questions
 from app.evaluation.report import ParserResults, format_comparison, format_report
 from app.evaluation.retrieval import evaluate_question
+from app.evaluation.text_overlap import (
+    RulebookOverlap,
+    format_text_report,
+    least_kept_first,
+    rulebook_overlaps,
+)
 from app.ingestion.embedder import BgeEmbedder, Embedder
 from app.ingestion.parsers import RulebookParser, create_parser
 from app.ingestion.pipeline import ingest_rulebook
@@ -97,6 +103,9 @@ def _parser() -> argparse.ArgumentParser:
     eval_options.add_argument("--parser", choices=_PARSERS, help=_PARSER_HELP)
     eval_options.add_argument(
         "--compare", action="store_true", help="score every parser's database, side by side"
+    )
+    commands.add_parser(
+        "eval-text", help="compare the LLM parser's Markdown with each PDF page's text layer"
     )
     return parser
 
@@ -200,6 +209,38 @@ async def _compare(settings: Settings) -> int:
     return 0
 
 
+# How many of the least-kept pages have their words printed; the report has counts only, since
+# it's committed and the rulebooks' text isn't.
+_PAGES_TO_PRINT = 5
+_WORDS_TO_PRINT = 15
+
+
+def _print_words(rulebooks: list[RulebookOverlap]) -> None:
+    for filename, page in least_kept_first(rulebooks)[:_PAGES_TO_PRINT]:
+        missing = [word for word, _ in page.missing.most_common(_WORDS_TO_PRINT)]
+        added = [word for word, _ in page.added.most_common(_WORDS_TO_PRINT)]
+        print(f"{filename} p. {page.page}, kept {page.kept:.0%}")
+        print(f"  missing: {' '.join(missing) or '-'}")
+        print(f"  added: {' '.join(added) or '-'}")
+
+
+async def _eval_text(settings: Settings) -> int:
+    """Compare the LLM eval database's Markdown with each PDF's text layer; write the report."""
+    engine = create_db_engine(settings)
+    try:
+        async with create_sessionmaker(engine)() as session:
+            rulebooks = await rulebook_overlaps(
+                session, settings.eval_rulebooks_dir, settings.ocr_min_page_chars
+            )
+    finally:
+        await engine.dispose()
+    _print_words(rulebooks)
+    now = datetime.now()
+    report = format_text_report(rulebooks, settings.ocr_min_page_chars, now)
+    _write_report(settings, f"{now:%Y-%m-%d-%H%M}-text.md", report)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     configure_logging()
     args = _parser().parse_args(argv)
@@ -211,6 +252,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "eval" and args.compare:
         return asyncio.run(_compare(settings), loop_factory=loop_factory)
+
+    if args.command == "eval-text":
+        llm_settings = _eval_settings(settings, "llm")
+        return asyncio.run(_eval_text(llm_settings), loop_factory=loop_factory)
 
     # Each parser's chunks are evaluated in their own database, so both stay ready to compare.
     eval_settings = _eval_settings(settings, args.parser or settings.pdf_parser)

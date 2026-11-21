@@ -126,3 +126,9 @@ eval-ingest *args:
 [working-directory: 'backend']
 eval *args:
     uv run python -m app.cli eval {{args}}
+
+# Compare the LLM eval database's Markdown with each PDF page's text layer and write a report to
+# backend/eval/reports/; the least-kept pages' missing and added words are printed, not saved.
+[working-directory: 'backend']
+eval-text:
+    uv run python -m app.cli eval-text

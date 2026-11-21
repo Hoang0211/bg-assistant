@@ -22,13 +22,18 @@ def read_page_count(data: bytes) -> int:
         raise InvalidPdfError("the file is not a readable PDF") from exc
 
 
-def low_text_pages(path: Path, min_chars: int) -> list[int]:
+def page_texts(path: Path) -> list[str]:
+    """Each page's text layer, in page order; a scanned page's is empty or nearly so."""
     with pymupdf.open(path) as doc:  # type: ignore[no-untyped-call]
-        return [
-            number
-            for number, page in enumerate(doc.pages(), start=1)
-            if len(cast(str, page.get_text()).strip()) < min_chars
-        ]
+        return [cast(str, page.get_text()) for page in doc.pages()]
+
+
+def low_text_pages(path: Path, min_chars: int) -> list[int]:
+    return [
+        number
+        for number, text in enumerate(page_texts(path), start=1)
+        if len(text.strip()) < min_chars
+    ]
 
 
 def render_page(path: Path, page: int, long_side_px: int) -> bytes:

@@ -86,3 +86,10 @@ def markdown_to_elements(markdown: str) -> list[Element]:
     the break is joined across it.
     """
     return _continue_sections(join_page_breaks(_read_blocks(markdown)))
+
+
+def split_pages(markdown: str) -> dict[int, str]:
+    """Each page's Markdown by page number, cut at the `<!-- page N -->` lines."""
+    # With the number captured, the split gives: text before the first marker, number, text, ...
+    parts = _PAGE_MARKER.split(markdown)
+    return {int(number): text for number, text in zip(parts[1::2], parts[2::2], strict=True)}

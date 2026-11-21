@@ -3,7 +3,7 @@ import pytest
 from app.db.models import ChunkType
 from app.ingestion.chunker import ChunkLimits, TextChunk, chunk_elements
 from app.ingestion.elements import Element, ElementKind
-from app.ingestion.markdown_elements import markdown_to_elements
+from app.ingestion.markdown_elements import markdown_to_elements, split_pages
 
 
 def test_markdown_to_elements_reads_each_block_on_its_page() -> None:
@@ -195,3 +195,13 @@ def test_markdown_to_elements_gives_the_chunker_a_tables_caption() -> None:
         "Setup\n\nPlace the board.",
         "Setup\n\n**Odds for Dice Rolls**\n\n| Roll | Odds |\n|---|---|\n| 6 & 8 | 14% |",
     ]
+
+
+def test_split_pages_returns_each_pages_markdown_by_number() -> None:
+    markdown = "<!-- page 1 -->\n\n# Setup\n\n<!-- page 2 -->\n\n<!-- page 3 -->\n\nTrade.\n"
+
+    assert split_pages(markdown) == {1: "\n\n# Setup\n\n", 2: "\n\n", 3: "\n\nTrade.\n"}
+
+
+def test_split_pages_drops_text_before_the_first_page() -> None:
+    assert split_pages("Cover\n\n<!-- page 1 -->\n\nSetup\n") == {1: "\n\nSetup\n"}

@@ -133,6 +133,10 @@ def test_parser_reads_the_eval_command() -> None:
     assert _parser().parse_args(["eval"]).command == "eval"
 
 
+def test_parser_reads_the_eval_text_command() -> None:
+    assert _parser().parse_args(["eval-text"]).command == "eval-text"
+
+
 def test_parser_reads_the_reparse_option() -> None:
     assert _parser().parse_args(["reindex", "--reparse"]).reparse is True
     assert _parser().parse_args(["reindex"]).reparse is False
