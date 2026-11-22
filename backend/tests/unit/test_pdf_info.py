@@ -4,13 +4,7 @@ import pymupdf
 import pytest
 from pymupdf import mupdf
 
-from app.ingestion.pdf_info import (
-    InvalidPdfError,
-    low_text_pages,
-    page_texts,
-    read_page_count,
-    render_page,
-)
+from app.ingestion.pdf_info import InvalidPdfError, page_texts, read_page_count, render_page
 from tests.helpers import add_text_page, make_pdf
 
 
@@ -42,17 +36,6 @@ def test_page_texts_returns_each_pages_text_layer(tmp_path: Path) -> None:
     doc.save(path)  # type: ignore[no-untyped-call]
 
     assert page_texts(path) == ["Setup\nPlayers take turns in clockwise order.\n", ""]
-
-
-def test_low_text_pages_returns_the_pages_under_the_limit(tmp_path: Path) -> None:
-    doc = pymupdf.open()  # type: ignore[no-untyped-call]
-    add_text_page(doc, "Setup", ["Players take turns in clockwise order."])
-    doc.new_page()
-    path = tmp_path / "rules.pdf"
-    doc.save(path)  # type: ignore[no-untyped-call]
-
-    assert low_text_pages(path, min_chars=10) == [2]
-    assert low_text_pages(path, min_chars=1000) == [1, 2]
 
 
 @pytest.mark.parametrize(("page", "size"), [(1, (1448, 2048)), (2, (2048, 1448))])

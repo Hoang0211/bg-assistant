@@ -102,7 +102,7 @@ gen-types:
     uv run python -m app.export_openapi ../frontend/openapi.json
     npm --prefix ../frontend run gen:api
 
-# Download the embedding and Docling models (about 1 GB, once per machine; the tests need them).
+# Download the embedding and reranker models (about 1 GB, once per machine; the tests need them).
 [working-directory: 'backend']
 download-models:
     uv run python -m app.ingestion.download_models
@@ -110,31 +110,30 @@ download-models:
 # --- Engine ---
 
 # Parse, chunk and embed the stored rulebooks again: `just reindex`, `just reindex --game 3`;
-# `--reparse` makes the LLM parser read the pages again instead of using the stored Markdown.
+# `--reparse` makes the model read the pages again instead of using the stored Markdown (paid).
 [working-directory: 'backend']
 reindex *args:
     uv run python -m app.cli reindex {{args}}
 
-# Build a parser's eval database from backend/eval/library.json and ingest its rulebooks:
-# `just eval-ingest --parser llm` (Docling takes about 10 minutes; `--reparse` pays the LLM again).
+# Build the eval database from backend/eval/library.json and ingest its rulebooks; stored Markdown
+# is reused, and `just eval-ingest --reparse` makes the model read every page again (paid).
 [working-directory: 'backend']
 eval-ingest *args:
     uv run python -m app.cli eval-ingest {{args}}
 
-# Search a parser's eval database for each golden question and write a report to
-# backend/eval/reports/: `just eval --parser llm`, or `just eval --compare` for both side by side.
+# Search the eval database for each golden question and write a report to backend/eval/reports/.
 [working-directory: 'backend']
-eval *args:
-    uv run python -m app.cli eval {{args}}
+eval:
+    uv run python -m app.cli eval
 
-# Compare the LLM eval database's Markdown with each PDF page's text layer and write a report to
+# Compare the eval database's Markdown with each PDF page's text layer and write a report to
 # backend/eval/reports/; the least-kept pages' missing and added words are printed, not saved.
 [working-directory: 'backend']
 eval-text:
     uv run python -m app.cli eval-text
 
-# Answer each golden question from each parser's top chunks and grade the answers, which spends
-# OpenAI credit (about $0.48); the report goes to backend/eval/reports/, the full answers to the
+# Answer each golden question from its top chunks and grade the answers, which spends OpenAI
+# credit (about $0.10); the report goes to backend/eval/reports/, the full answers to the
 # git-ignored backend/data/answer-checks/.
 [working-directory: 'backend']
 eval-answers:

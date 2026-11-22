@@ -3,7 +3,7 @@ from datetime import datetime
 from app.config import Settings
 from app.evaluation.metrics import Place
 from app.evaluation.questions import GoldenQuestion
-from app.evaluation.report import ParserResults, format_comparison, format_report
+from app.evaluation.report import EvalRun, format_report
 from app.evaluation.retrieval import QuestionResult
 
 SETTINGS = Settings(
@@ -35,11 +35,6 @@ def _question(question_id: str, game: str, tags: list[str]) -> GoldenQuestion:
     return GoldenQuestion(
         id=question_id, game=game, question="?", expected=[], answer="", tags=tags
     )
-
-
-def _result(question: GoldenQuestion, hits: list[bool], score: float) -> QuestionResult:
-    """A result whose recall, reciprocal rank and nDCG are all `score`."""
-    return QuestionResult(question, [Place("a.pdf", 1, 1)] * len(hits), hits, score, score, score)
 
 
 def test_format_report_shows_the_scores_and_each_questions_top_results() -> None:
@@ -80,12 +75,11 @@ def test_format_report_shows_the_scores_and_each_questions_top_results() -> None
         ),
     ]
 
-    report = format_report(ParserResults("llm", 12, hybrid, reranked), SETTINGS, NOW)
+    report = format_report(EvalRun(12, hybrid, reranked), SETTINGS, NOW)
 
     assert report == (
         "# Retrieval eval: 2026-11-15 09:05\n"
         "\n"
-        "- Parser: llm\n"
         f"{SEARCH_LINES}"
         "- Chunks in the eval database: 12\n"
         f"{HIT_NOTE}"
@@ -105,76 +99,4 @@ def test_format_report_shows_the_scores_and_each_questions_top_results() -> None
         "| --- | --: | --: | --- | --- |\n"
         "| q-1 | 2 | 1 | a.pdf p. 1, a.pdf pp. 2–3 ✓ | a.pdf pp. 2–3 ✓, a.pdf p. 1 |\n"
         "| q-2 | – | – | b.pdf p. 4 | b.pdf p. 4 |\n"
-    )
-
-
-def test_format_comparison_shows_both_parsers_scores_and_the_questions_that_differ() -> None:
-    base = _question("q-1", "Base", ["table"])
-    expansion = _question("q-2", "Expansion", [])
-    docling = ParserResults(
-        "docling",
-        10,
-        hybrid=[_result(base, [False, True], 0.5), _result(expansion, [False], 0.0)],
-        reranked=[_result(base, [True, False], 1.0), _result(expansion, [False], 0.0)],
-    )
-    llm = ParserResults(
-        "llm",
-        14,
-        hybrid=[_result(base, [True, False], 1.0), _result(expansion, [False], 0.0)],
-        reranked=[_result(base, [True, False], 1.0), _result(expansion, [True], 1.0)],
-    )
-
-    report = format_comparison(docling, llm, SETTINGS, NOW)
-
-    table_header = (
-        "| Questions | Count | docling Recall@2 | docling MRR | docling nDCG@2"
-        " | llm Recall@2 | llm MRR | llm nDCG@2 |\n"
-        "| --- | --: | --: | --: | --: | --: | --: | --: |\n"
-    )
-    assert report == (
-        "# Parser comparison: 2026-11-15 09:05\n"
-        "\n"
-        "- Parsers: docling (10 chunks), llm (14 chunks)\n"
-        f"{SEARCH_LINES}"
-        f"{HIT_NOTE}"
-        "\n"
-        "## Hybrid search\n"
-        "\n"
-        f"{table_header}"
-        "| all | 2 | 0.25 | 0.25 | 0.25 | 0.50 | 0.50 | 0.50 |\n"
-        "| Base | 1 | 0.50 | 0.50 | 0.50 | 1.00 | 1.00 | 1.00 |\n"
-        "| Expansion | 1 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |\n"
-        "| table | 1 | 0.50 | 0.50 | 0.50 | 1.00 | 1.00 | 1.00 |\n"
-        "\n"
-        "## Reranked\n"
-        "\n"
-        f"{table_header}"
-        "| all | 2 | 0.50 | 0.50 | 0.50 | 1.00 | 1.00 | 1.00 |\n"
-        "| Base | 1 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |\n"
-        "| Expansion | 1 | 0.00 | 0.00 | 0.00 | 1.00 | 1.00 | 1.00 |\n"
-        "| table | 1 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |\n"
-        "\n"
-        "## Questions that differ\n"
-        "\n"
-        "The rank of each search's first hit (– = none in the top 2); each parser's own report"
-        " lists its top 2.\n"
-        "\n"
-        "| Question | docling hybrid | llm hybrid | docling reranked | llm reranked |\n"
-        "| --- | --: | --: | --: | --: |\n"
-        "| q-1 | 2 | 1 | 1 | 1 |\n"
-        "| q-2 | – | – | – | 1 |\n"
-    )
-
-
-def test_format_comparison_says_when_no_question_differs() -> None:
-    results = [_result(_question("q-1", "Base", []), [False, True], 0.5)]
-    docling = ParserResults("docling", 10, hybrid=results, reranked=results)
-    llm = ParserResults("llm", 14, hybrid=results, reranked=results)
-
-    report = format_comparison(docling, llm, SETTINGS, NOW)
-
-    assert report.endswith(
-        "## Questions that differ\n"
-        "\n"
-        "Every question's first hit is at the same rank for both parsers.\n"
     )

@@ -14,8 +14,6 @@ from app.ingestion.parsers import FakeParser, ParsedRulebook
 class FailingParser:
     """A parser whose every parse fails with the given error."""
 
-    chunk_min_tokens = 80
-
     def __init__(self, error: Exception) -> None:
         self._error = error
 

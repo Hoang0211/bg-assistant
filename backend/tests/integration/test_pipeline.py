@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db.models import Chunk, ChunkType, Game, Rulebook, RulebookStatus
 from app.ingestion.elements import Element, ElementKind
 from app.ingestion.embedder import FakeEmbedder
-from app.ingestion.parse_process import ParseFailedError
 from app.ingestion.parsers import FakeParser
 from app.ingestion.pipeline import ingest_rulebook
 from tests.helpers import DeletingParser, FailingParser, add_text_page
@@ -59,7 +58,7 @@ async def test_ingest_rulebook_stores_the_chunks_and_the_report(
     [chunk] = (await db_session.scalars(select(Chunk))).all()
 
     assert rulebook.status == RulebookStatus.READY
-    assert rulebook.parse_report == {"chunk_count": 1, "ocr_pages": [], "empty_pages": [2]}
+    assert rulebook.parse_report == {"chunk_count": 1, "empty_pages": [2]}
     assert (chunk.game_id, chunk.section_path, chunk.chunk_type) == (
         rulebook.game_id,
         "Setup",
@@ -123,7 +122,7 @@ async def test_ingest_rulebook_gives_the_chunks_the_rulebooks_current_game(
     assert list(await db_session.scalars(select(Chunk.game_id))) == [other_game.id]
 
 
-async def test_ingest_rulebook_uses_the_parsers_chunk_minimum(
+async def test_ingest_rulebook_merges_sections_under_the_chunk_minimum(
     db_session: AsyncSession, tmp_path: Path
 ) -> None:
     rulebook = await _add_rulebook(db_session, tmp_path)
@@ -133,13 +132,12 @@ async def test_ingest_rulebook_uses_the_parsers_chunk_minimum(
         Element(ElementKind.HEADING, "Scoring", 1),
         Element(ElementKind.PARAGRAPH, "The most points wins.", 1),
     ]
-    # Each section is 4 or 5 tokens: under the default minimum of 80, but not under 4.
-    parser = FakeParser(elements, chunk_min_tokens=4)
 
-    await ingest_rulebook(db_session, rulebook.id, tmp_path, parser, FakeEmbedder())
+    # Each section is a few tokens, under the chunk_min_tokens setting of 20.
+    await ingest_rulebook(db_session, rulebook.id, tmp_path, FakeParser(elements), FakeEmbedder())
 
     paths = (await db_session.scalars(select(Chunk.section_path).order_by(Chunk.id))).all()
-    assert paths == ["Setup", "Scoring"]
+    assert paths == ["Setup"]
 
 
 async def test_ingest_rulebook_stores_the_parsers_new_markdown(
@@ -192,16 +190,14 @@ async def test_ingest_rulebook_saves_the_error_when_parsing_fails(
     db_session: AsyncSession, tmp_path: Path
 ) -> None:
     rulebook = await _add_rulebook(db_session, tmp_path)
-    parser = FailingParser(
-        ParseFailedError("parsing failed 3 times; the backend log has the details")
-    )
+    parser = FailingParser(RuntimeError("OPENAI_API_KEY isn't set; add it to backend/.env"))
 
     await ingest_rulebook(db_session, rulebook.id, tmp_path, parser, FakeEmbedder())
 
     await db_session.refresh(rulebook)
     assert (rulebook.status, rulebook.error) == (
         RulebookStatus.FAILED,
-        "parsing failed 3 times; the backend log has the details",
+        "OPENAI_API_KEY isn't set; add it to backend/.env",
     )
 
 
@@ -218,7 +214,7 @@ async def test_ingest_rulebook_keeps_the_old_chunks_when_saving_fails(
     await db_session.refresh(rulebook)
     contents = (await db_session.scalars(select(Chunk.content))).all()
     assert rulebook.status == RulebookStatus.FAILED
-    assert rulebook.parse_report == {"chunk_count": 1, "ocr_pages": [], "empty_pages": [2]}
+    assert rulebook.parse_report == {"chunk_count": 1, "empty_pages": [2]}
     assert contents == [f"Setup\n\n{RULE}"]
 
 

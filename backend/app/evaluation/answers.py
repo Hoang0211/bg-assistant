@@ -35,14 +35,6 @@ class AnswerResult:
     output_tokens: int
 
 
-@dataclass(frozen=True)
-class ParserAnswers:
-    """Every golden question answered from one parser's eval database."""
-
-    parser: str
-    results: list[AnswerResult]
-
-
 # Static and sent first, so OpenAI can cache it across questions.
 _ANSWER_INSTRUCTIONS = """\
 You answer questions about board game rules using only the rulebook excerpts given with the
@@ -164,31 +156,17 @@ async def check_answer(
     )
 
 
-def _counts(results: list[AnswerResult]) -> str:
-    return " | ".join(
+def _count_row(label: str, results: list[AnswerResult]) -> str:
+    counts = " | ".join(
         str(sum(result.verdict == verdict for result in results)) for verdict in Verdict
     )
+    return f"| {label} | {len(results)} | {counts} |"
 
 
-def _count_row(label: str, pairs: list[tuple[AnswerResult, AnswerResult]]) -> str:
-    first = [result for result, _ in pairs]
-    second = [result for _, result in pairs]
-    return f"| {label} | {len(pairs)} | {_counts(first)} | {_counts(second)} |"
-
-
-def _question_row(first: AnswerResult, second: AnswerResult) -> str:
-    differ = "≠" if first.verdict != second.verdict else ""
-    return f"| {first.question.id} | {first.verdict} | {second.verdict} | {differ} |"
-
-
-def format_answer_report(
-    first: ParserAnswers, second: ParserAnswers, settings: Settings, now: datetime
-) -> str:
-    """Each parser's verdict counts, for all, each game and each tag, then each question's."""
-    pairs = list(zip(first.results, second.results, strict=True))
-    games = list(dict.fromkeys(result.question.game for result, _ in pairs))  # in question order
-    tags = sorted({tag for result, _ in pairs for tag in result.question.tags})
-    names = [first.parser, second.parser]
+def format_answer_report(results: list[AnswerResult], settings: Settings, now: datetime) -> str:
+    """The verdict counts for all, each game and each tag, then each question's verdict."""
+    games = list(dict.fromkeys(result.question.game for result in results))  # in question order
+    tags = sorted({tag for result in results for tag in result.question.tags})
     lines = [
         f"# Answer check: {now:%Y-%m-%d %H:%M}",
         "",
@@ -199,42 +177,35 @@ def format_answer_report(
         ' a hedge. Wrong: a contradiction, the main fact missing, or "not covered".',
         "- The answers quote the rulebooks, so they're kept out of this report.",
         "",
-        "| Questions | Count | "
-        + " | ".join(f"{name} {verdict}" for name in names for verdict in Verdict)
-        + " |",
-        "| --- | --: | --: | --: | --: | --: | --: | --: |",
-        _count_row("all", pairs),
-        *[_count_row(game, [p for p in pairs if p[0].question.game == game]) for game in games],
-        *[_count_row(tag, [p for p in pairs if tag in p[0].question.tags]) for tag in tags],
+        "| Questions | Count | Correct | Partial | Wrong |",
+        "| --- | --: | --: | --: | --: |",
+        _count_row("all", results),
+        *[_count_row(game, [r for r in results if r.question.game == game]) for game in games],
+        *[_count_row(tag, [r for r in results if tag in r.question.tags]) for tag in tags],
         "",
         "## Questions",
         "",
-        f"| Question | {first.parser} | {second.parser} | Differ |",
-        "| --- | --- | --- | --- |",
-        *[_question_row(first_result, second_result) for first_result, second_result in pairs],
+        "| Question | Verdict |",
+        "| --- | --- |",
+        *[f"| {result.question.id} | {result.verdict} |" for result in results],
     ]
     return "\n".join(lines) + "\n"
 
 
-def format_answer_details(first: ParserAnswers, second: ParserAnswers, now: datetime) -> str:
-    """Every question's two answers and verdicts in full, for reading by hand; not committed."""
+def format_answer_details(results: list[AnswerResult], now: datetime) -> str:
+    """Every question's answer, verdict and reason in full, for reading by hand; not committed."""
     lines = [f"# Answer check details: {now:%Y-%m-%d %H:%M}"]
-    for first_result, second_result in zip(first.results, second.results, strict=True):
-        question = first_result.question
-        differ = " (verdicts differ)" if first_result.verdict != second_result.verdict else ""
+    for result in results:
         lines += [
             "",
-            f"## {question.id}{differ}",
+            f"## {result.question.id}",
             "",
-            f"**Question:** {question.question}",
+            f"**Question:** {result.question.question}",
             "",
-            f"**Golden answer:** {question.answer}",
+            f"**Golden answer:** {result.question.answer}",
+            "",
+            f"**{result.verdict}.** {result.reason}",
+            "",
+            result.answer,
         ]
-        for name, result in ((first.parser, first_result), (second.parser, second_result)):
-            lines += [
-                "",
-                f"**{name}: {result.verdict}.** {result.reason}",
-                "",
-                result.answer,
-            ]
     return "\n".join(lines) + "\n"

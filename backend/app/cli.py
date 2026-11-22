@@ -15,7 +15,6 @@ from app.db.models import Chunk, Rulebook, RulebookStatus
 from app.db.session import create_db_engine, create_sessionmaker
 from app.evaluation.answers import (
     AnswerResult,
-    ParserAnswers,
     check_answer,
     format_answer_details,
     format_answer_report,
@@ -23,7 +22,7 @@ from app.evaluation.answers import (
 from app.evaluation.database import create_database_if_missing, eval_database_url, migrate
 from app.evaluation.library import load_library, read_library
 from app.evaluation.questions import read_questions
-from app.evaluation.report import ParserResults, format_comparison, format_report
+from app.evaluation.report import EvalRun, format_report
 from app.evaluation.retrieval import evaluate_question
 from app.evaluation.text_overlap import (
     RulebookOverlap,
@@ -32,11 +31,11 @@ from app.evaluation.text_overlap import (
     rulebook_overlaps,
 )
 from app.ingestion.embedder import BgeEmbedder, Embedder
-from app.ingestion.parsers import RulebookParser, create_parser
+from app.ingestion.parsers import LlmParser, RulebookParser
 from app.ingestion.pipeline import ingest_rulebook
-from app.llm.base import LLMProvider, create_llm_provider
+from app.llm.base import create_llm_provider
 from app.log_setup import configure_logging
-from app.retrieval.reranker import BgeReranker, Reranker
+from app.retrieval.reranker import BgeReranker
 
 
 async def reindex(
@@ -49,7 +48,7 @@ async def reindex(
 ) -> int:
     """Ingest the stored rulebooks again, one at a time; return how many failed.
 
-    With `reparse`, stored Markdown is ignored, so the LLM parser reads every page again.
+    With `reparse`, stored Markdown is ignored, so the parser reads every page again.
     """
     query = select(Rulebook.id).order_by(Rulebook.id)
     if game_id is not None:
@@ -86,9 +85,7 @@ async def reindex(
     return failed
 
 
-_PARSERS = ["docling", "llm"]
-_PARSER_HELP = "the parser whose eval database to use (default: the pdf_parser setting)"
-_REPARSE_HELP = "ignore stored Markdown, so the LLM parser reads every page again (and is paid)"
+_REPARSE_HELP = "ignore stored Markdown, so the model reads every page again (and is paid)"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -100,33 +97,23 @@ def _parser() -> argparse.ArgumentParser:
     reindex_parser.add_argument("--game", type=int, help="only this game's rulebooks")
     reindex_parser.add_argument("--reparse", action="store_true", help=_REPARSE_HELP)
     eval_ingest_parser = commands.add_parser(
-        "eval-ingest", help="build a parser's eval database from the eval library and ingest it"
+        "eval-ingest", help="build the eval database from the eval library and ingest it"
     )
-    eval_ingest_parser.add_argument("--parser", choices=_PARSERS, help=_PARSER_HELP)
     eval_ingest_parser.add_argument("--reparse", action="store_true", help=_REPARSE_HELP)
-    eval_parser = commands.add_parser(
-        "eval", help="search a parser's eval database for each golden question"
-    )
-    eval_options = eval_parser.add_mutually_exclusive_group()
-    eval_options.add_argument("--parser", choices=_PARSERS, help=_PARSER_HELP)
-    eval_options.add_argument(
-        "--compare", action="store_true", help="score every parser's database, side by side"
+    commands.add_parser("eval", help="search the eval database for each golden question")
+    commands.add_parser(
+        "eval-text", help="compare the eval rulebooks' Markdown with each PDF page's text layer"
     )
     commands.add_parser(
-        "eval-text", help="compare the LLM parser's Markdown with each PDF page's text layer"
-    )
-    commands.add_parser(
-        "eval-answers",
-        help="answer each golden question from each parser's chunks and grade it (paid)",
+        "eval-answers", help="answer each golden question from its chunks and grade it (paid)"
     )
     return parser
 
 
-def _eval_settings(settings: Settings, pdf_parser: str) -> Settings:
-    """The settings for one parser's eval database, on the same server as the dev database."""
-    name = f"{settings.eval_database_name}_{pdf_parser}"
-    url = eval_database_url(settings.database_url, name)
-    return settings.model_copy(update={"database_url": url, "pdf_parser": pdf_parser})
+def _eval_settings(settings: Settings) -> Settings:
+    """The settings for the eval database, on the same server as the dev database."""
+    url = eval_database_url(settings.database_url, settings.eval_database_name)
+    return settings.model_copy(update={"database_url": url})
 
 
 async def _reindex(settings: Settings, game_id: int | None, reparse: bool) -> int:
@@ -135,7 +122,7 @@ async def _reindex(settings: Settings, game_id: int | None, reparse: bool) -> in
         failed = await reindex(
             create_sessionmaker(engine),
             settings.upload_dir,
-            create_parser(settings),
+            LlmParser(settings),
             BgeEmbedder(settings.embedding_model),
             game_id,
             reparse,
@@ -156,7 +143,7 @@ async def _eval_ingest(settings: Settings, reparse: bool) -> int:
         failed = await reindex(
             sessionmaker,
             settings.eval_rulebooks_dir,
-            create_parser(settings),
+            LlmParser(settings),
             BgeEmbedder(settings.embedding_model),
             reparse=reparse,
         )
@@ -165,11 +152,18 @@ async def _eval_ingest(settings: Settings, reparse: bool) -> int:
     return 1 if failed else 0
 
 
-async def _search_parser(
-    settings: Settings, embedder: Embedder, reranker: Reranker
-) -> ParserResults:
-    """Search one parser's eval database for each golden question, without and with reranking."""
+def _write_report(settings: Settings, name: str, report: str) -> None:
+    path = settings.eval_dir / "reports" / name
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(report, encoding="utf-8")
+    print(f"wrote {path}")
+
+
+async def _eval(settings: Settings) -> int:
+    """Score each golden question's search results, without and with reranking; write the report."""
     questions = read_questions(settings.eval_dir / "golden_questions.json")
+    embedder = BgeEmbedder(settings.embedding_model)
+    reranker = BgeReranker(settings.reranker_model)
     engine = create_db_engine(settings)
     try:
         async with create_sessionmaker(engine)() as session:
@@ -186,38 +180,9 @@ async def _search_parser(
             chunk_count = await session.scalar(select(func.count()).select_from(Chunk))
     finally:
         await engine.dispose()
-    return ParserResults(settings.pdf_parser, chunk_count or 0, hybrid, reranked)
-
-
-def _write_report(settings: Settings, name: str, report: str) -> None:
-    path = settings.eval_dir / "reports" / name
-    path.parent.mkdir(exist_ok=True)
-    path.write_text(report, encoding="utf-8")
-    print(f"wrote {path}")
-
-
-async def _eval(settings: Settings) -> int:
-    """Score each golden question's search results, without and with reranking; write the report."""
-    embedder = BgeEmbedder(settings.embedding_model)
-    reranker = BgeReranker(settings.reranker_model)
-    results = await _search_parser(settings, embedder, reranker)
     now = datetime.now()
-    report = format_report(results, settings, now)
+    report = format_report(EvalRun(chunk_count or 0, hybrid, reranked), settings, now)
     _write_report(settings, f"{now:%Y-%m-%d-%H%M}-retrieval.md", report)
-    return 0
-
-
-async def _compare(settings: Settings) -> int:
-    """Score each parser's eval database the same way and write them side by side."""
-    embedder = BgeEmbedder(settings.embedding_model)
-    reranker = BgeReranker(settings.reranker_model)
-    first, second = [
-        await _search_parser(_eval_settings(settings, parser), embedder, reranker)
-        for parser in _PARSERS
-    ]
-    now = datetime.now()
-    report = format_comparison(first, second, settings, now)
-    _write_report(settings, f"{now:%Y-%m-%d-%H%M}-comparison.md", report)
     return 0
 
 
@@ -237,56 +202,43 @@ def _print_words(rulebooks: list[RulebookOverlap]) -> None:
 
 
 async def _eval_text(settings: Settings) -> int:
-    """Compare the LLM eval database's Markdown with each PDF's text layer; write the report."""
+    """Compare the eval database's Markdown with each PDF's text layer; write the report."""
+    min_chars = settings.eval_text_min_page_chars
     engine = create_db_engine(settings)
     try:
         async with create_sessionmaker(engine)() as session:
-            rulebooks = await rulebook_overlaps(
-                session, settings.eval_rulebooks_dir, settings.ocr_min_page_chars
-            )
+            rulebooks = await rulebook_overlaps(session, settings.eval_rulebooks_dir, min_chars)
     finally:
         await engine.dispose()
     _print_words(rulebooks)
     now = datetime.now()
-    report = format_text_report(rulebooks, settings.ocr_min_page_chars, now)
+    report = format_text_report(rulebooks, min_chars, now)
     _write_report(settings, f"{now:%Y-%m-%d-%H%M}-text.md", report)
     return 0
 
 
-async def _answer_parser(settings: Settings, embedder: Embedder, llm: LLMProvider) -> ParserAnswers:
-    """Answer and grade every golden question from one parser's eval database, one at a time."""
+async def _eval_answers(settings: Settings) -> int:
+    """Answer and grade each golden question; write the report and, git-ignored, the answers."""
     questions = read_questions(settings.eval_dir / "golden_questions.json")
-    engine = create_db_engine(settings)
+    embedder = BgeEmbedder(settings.embedding_model)
+    llm = create_llm_provider(settings)
     results: list[AnswerResult] = []
+    engine = create_db_engine(settings)
     try:
         async with create_sessionmaker(engine)() as session:
             for question in questions:
                 result = await check_answer(session, embedder, llm, settings, question)
-                print(f"{settings.pdf_parser} {question.id}: {result.verdict}")
+                print(f"{question.id}: {result.verdict}")
                 results.append(result)
     finally:
         await engine.dispose()
-    return ParserAnswers(settings.pdf_parser, results)
-
-
-async def _eval_answers(settings: Settings) -> int:
-    """Answer and grade each parser's results; write the report and, git-ignored, the answers."""
-    embedder = BgeEmbedder(settings.embedding_model)
-    llm = create_llm_provider(settings)
-    first, second = [
-        await _answer_parser(_eval_settings(settings, parser), embedder, llm) for parser in _PARSERS
-    ]
     now = datetime.now()
-    _write_report(
-        settings,
-        f"{now:%Y-%m-%d-%H%M}-answers.md",
-        format_answer_report(first, second, settings, now),
-    )
+    report = format_answer_report(results, settings, now)
+    _write_report(settings, f"{now:%Y-%m-%d-%H%M}-answers.md", report)
     details = settings.eval_answers_dir / f"{now:%Y-%m-%d-%H%M}-answers.md"
     details.parent.mkdir(parents=True, exist_ok=True)
-    details.write_text(format_answer_details(first, second, now), encoding="utf-8")
+    details.write_text(format_answer_details(results, now), encoding="utf-8")
     print(f"wrote {details}")
-    results = first.results + second.results
     input_tokens = sum(result.input_tokens for result in results)
     output_tokens = sum(result.output_tokens for result in results)
     print(f"used {input_tokens} input and {output_tokens} output tokens")
@@ -302,23 +254,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "reindex":
         return asyncio.run(_reindex(settings, args.game, args.reparse), loop_factory=loop_factory)
 
-    if args.command == "eval" and args.compare:
-        return asyncio.run(_compare(settings), loop_factory=loop_factory)
-
-    if args.command == "eval-text":
-        llm_settings = _eval_settings(settings, "llm")
-        return asyncio.run(_eval_text(llm_settings), loop_factory=loop_factory)
-
-    if args.command == "eval-answers":
-        return asyncio.run(_eval_answers(settings), loop_factory=loop_factory)
-
-    # Each parser's chunks are evaluated in their own database, so both stay ready to compare.
-    eval_settings = _eval_settings(settings, args.parser or settings.pdf_parser)
+    # The eval commands work on their own database, on the same server.
+    eval_settings = _eval_settings(settings)
     if args.command == "eval-ingest":
         # Alembic runs its own event loop, so the database is made ready before ours starts.
         create_database_if_missing(eval_settings.database_url)
         migrate(eval_settings.database_url)
         return asyncio.run(_eval_ingest(eval_settings, args.reparse), loop_factory=loop_factory)
+
+    if args.command == "eval-text":
+        return asyncio.run(_eval_text(eval_settings), loop_factory=loop_factory)
+
+    if args.command == "eval-answers":
+        return asyncio.run(_eval_answers(eval_settings), loop_factory=loop_factory)
 
     return asyncio.run(_eval(eval_settings), loop_factory=loop_factory)
 

@@ -1,11 +1,11 @@
 from pathlib import Path
-from typing import Literal
 
 import pytest
+from pydantic import SecretStr
 
 from app.config import Settings, get_settings
 from app.ingestion.elements import Element, ElementKind
-from app.ingestion.parsers import DoclingParser, LlmParser, ParsedRulebook, create_parser
+from app.ingestion.parsers import LlmParser, ParsedRulebook
 from app.llm.fake import FakeLLMProvider
 from tests.helpers import make_pdf
 
@@ -14,6 +14,9 @@ ELEMENTS = [
     Element(ElementKind.HEADING, "Setup", 1),
     Element(ElementKind.PARAGRAPH, "Roll the dice.", 1),
 ]
+
+# Settings that would make the OpenAI provider, which refuses to be created without a key.
+NO_KEY = Settings(llm_provider="openai", openai_api_key=SecretStr(""))
 
 
 async def test_llm_parser_writes_new_markdown_with_the_model(tmp_path: Path) -> None:
@@ -37,21 +40,15 @@ async def test_llm_parser_reuses_the_stored_markdown_without_the_model(tmp_path:
     assert llm.calls == []
 
 
-@pytest.mark.parametrize(
-    ("pdf_parser", "parser_class", "chunk_min_tokens"),
-    [("docling", DoclingParser, 80), ("llm", LlmParser, 20)],
-)
-def test_create_parser_returns_the_chosen_parser_with_its_minimum(
-    pdf_parser: Literal["docling", "llm"], parser_class: type[object], chunk_min_tokens: int
-) -> None:
-    settings = Settings(
-        pdf_parser=pdf_parser,
-        llm_provider="fake",
-        chunk_min_tokens=80,
-        markdown_chunk_min_tokens=20,
-    )
+async def test_llm_parser_reads_stored_markdown_without_an_api_key(tmp_path: Path) -> None:
+    parsed = await LlmParser(NO_KEY).parse(tmp_path / "missing.pdf", 1, MARKDOWN)
 
-    parser = create_parser(settings)
+    assert parsed == ParsedRulebook(ELEMENTS)
 
-    assert isinstance(parser, parser_class)
-    assert parser.chunk_min_tokens == chunk_min_tokens
+
+async def test_llm_parser_needs_an_api_key_only_to_call_the_model(tmp_path: Path) -> None:
+    path = tmp_path / "rules.pdf"
+    path.write_bytes(make_pdf(1))
+
+    with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+        await LlmParser(NO_KEY).parse(path, 1, None)

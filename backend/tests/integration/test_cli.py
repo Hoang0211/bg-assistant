@@ -148,34 +148,16 @@ def test_parser_reads_the_reparse_option() -> None:
     assert _parser().parse_args(["eval-ingest"]).reparse is False
 
 
-def test_parser_reads_the_parser_option() -> None:
-    assert _parser().parse_args(["eval-ingest", "--parser", "llm"]).parser == "llm"
-    assert _parser().parse_args(["eval", "--parser", "docling"]).parser == "docling"
-    assert _parser().parse_args(["eval"]).parser is None
-
-
-def test_parser_reads_the_compare_option() -> None:
-    assert _parser().parse_args(["eval", "--compare"]).compare is True
-    assert _parser().parse_args(["eval"]).compare is False
-
-
-def test_parser_rejects_compare_with_a_parser() -> None:
-    with pytest.raises(SystemExit):
-        _parser().parse_args(["eval", "--compare", "--parser", "llm"])
-
-
-def test_eval_settings_point_at_the_parsers_own_database() -> None:
+def test_eval_settings_point_at_the_eval_database() -> None:
     settings = Settings(
         database_url="postgresql+psycopg://bg:secret@localhost:5432/bg_assistant",
         eval_database_name="bg_assistant_eval",
-        pdf_parser="docling",
     )
 
-    eval_settings = _eval_settings(settings, "llm")
+    eval_settings = _eval_settings(settings)
 
-    assert (eval_settings.database_url, eval_settings.pdf_parser) == (
-        "postgresql+psycopg://bg:secret@localhost:5432/bg_assistant_eval_llm",
-        "llm",
+    assert eval_settings.database_url == (
+        "postgresql+psycopg://bg:secret@localhost:5432/bg_assistant_eval"
     )
 
 

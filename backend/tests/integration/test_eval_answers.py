@@ -7,7 +7,6 @@ from app.db.models import Chunk, ChunkType, Game, Rulebook
 from app.evaluation.answers import (
     AnswerResult,
     JudgeReply,
-    ParserAnswers,
     Verdict,
     answer_prompt,
     answer_question,
@@ -196,15 +195,14 @@ async def test_check_answer_counts_a_missing_verdict_as_wrong(db_session: AsyncS
     )
 
 
-def test_format_answer_report_counts_each_parsers_verdicts_and_lists_each_question() -> None:
-    base = _question("q-1", "Base", ["table"])
-    expansion = _question("q-2", "Expansion", [])
-    docling = ParserAnswers(
-        "docling", [_answer(base, Verdict.PARTIAL), _answer(expansion, Verdict.WRONG)]
-    )
-    llm = ParserAnswers("llm", [_answer(base, Verdict.CORRECT), _answer(expansion, Verdict.WRONG)])
+def test_format_answer_report_counts_the_verdicts_and_lists_each_question() -> None:
+    results = [
+        _answer(_question("q-1", "Base", ["table"]), Verdict.CORRECT),
+        _answer(_question("q-2", "Base", []), Verdict.PARTIAL),
+        _answer(_question("q-3", "Expansion", ["table"]), Verdict.WRONG),
+    ]
 
-    report = format_answer_report(docling, llm, SETTINGS, datetime(2026, 11, 21, 14, 5))
+    report = format_answer_report(results, SETTINGS, datetime(2026, 11, 21, 14, 5))
 
     assert report == (
         "# Answer check: 2026-11-21 14:05\n"
@@ -215,43 +213,38 @@ def test_format_answer_report_counts_each_parsers_verdicts_and_lists_each_questi
         ' a hedge. Wrong: a contradiction, the main fact missing, or "not covered".\n'
         "- The answers quote the rulebooks, so they're kept out of this report.\n"
         "\n"
-        "| Questions | Count | docling correct | docling partial | docling wrong"
-        " | llm correct | llm partial | llm wrong |\n"
-        "| --- | --: | --: | --: | --: | --: | --: | --: |\n"
-        "| all | 2 | 0 | 1 | 1 | 1 | 0 | 1 |\n"
-        "| Base | 1 | 0 | 1 | 0 | 1 | 0 | 0 |\n"
-        "| Expansion | 1 | 0 | 0 | 1 | 0 | 0 | 1 |\n"
-        "| table | 1 | 0 | 1 | 0 | 1 | 0 | 0 |\n"
+        "| Questions | Count | Correct | Partial | Wrong |\n"
+        "| --- | --: | --: | --: | --: |\n"
+        "| all | 3 | 1 | 1 | 1 |\n"
+        "| Base | 2 | 1 | 1 | 0 |\n"
+        "| Expansion | 1 | 0 | 0 | 1 |\n"
+        "| table | 2 | 1 | 0 | 1 |\n"
         "\n"
         "## Questions\n"
         "\n"
-        "| Question | docling | llm | Differ |\n"
-        "| --- | --- | --- | --- |\n"
-        "| q-1 | partial | correct | ≠ |\n"
-        "| q-2 | wrong | wrong |  |\n"
+        "| Question | Verdict |\n"
+        "| --- | --- |\n"
+        "| q-1 | correct |\n"
+        "| q-2 | partial |\n"
+        "| q-3 | wrong |\n"
     )
 
 
-def test_format_answer_details_shows_each_questions_answers_and_verdicts() -> None:
-    docling = ParserAnswers("docling", [_answer(QUESTION, Verdict.WRONG)])
-    llm = ParserAnswers("llm", [_answer(QUESTION, Verdict.CORRECT)])
-
-    details = format_answer_details(docling, llm, datetime(2026, 11, 21, 14, 5))
+def test_format_answer_details_shows_each_questions_answer_and_verdict() -> None:
+    details = format_answer_details(
+        [_answer(QUESTION, Verdict.WRONG)], datetime(2026, 11, 21, 14, 5)
+    )
 
     assert details == (
         "# Answer check details: 2026-11-21 14:05\n"
         "\n"
-        "## q-1 (verdicts differ)\n"
+        "## q-1\n"
         "\n"
         "**Question:** What happens on a 7?\n"
         "\n"
         "**Golden answer:** The robber moves.\n"
         "\n"
-        "**docling: wrong.** wrong reason\n"
+        "**wrong.** wrong reason\n"
         "\n"
         "wrong answer\n"
-        "\n"
-        "**llm: correct.** correct reason\n"
-        "\n"
-        "correct answer\n"
     )

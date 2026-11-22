@@ -27,28 +27,19 @@ class Settings(BaseSettings):
     eval_dir: Path = Path("eval")
     eval_rulebooks_dir: Path = Path("data/rulebooks")
 
+    # A page with fewer characters in its text layer (scanned or nearly blank) has nothing for
+    # just eval-text to compare the Markdown with, so it isn't checked.
+    eval_text_min_page_chars: int = 100
+
     # Largest rulebook PDF accepted, in MB.
     max_upload_mb: int = 50
-
-    # Ingestion reads rulebooks with Docling, or with the vision model below ("llm").
-    pdf_parser: Literal["docling", "llm"] = "docling"
-
-    # Pages with fewer characters in their text layer are parsed with OCR.
-    ocr_min_page_chars: int = 100
-
-    # Times the parse is tried in its own process before the rulebook is marked as failed.
-    parse_attempts: int = 3
-
-    # A parse that runs longer than this is stopped and not tried again.
-    parse_timeout_seconds: int = 600
 
     # Off in tests, so starting the app there doesn't ingest rulebooks from the dev database.
     run_ingestion_worker: bool = True
 
-    # Sections with fewer tokens are merged into a neighbouring section. The LLM parser's headings
-    # are the rulebook's real section titles, so its sections are merged only when they're tiny.
-    chunk_min_tokens: int = 80
-    markdown_chunk_min_tokens: int = 20
+    # Sections with fewer tokens are merged into a neighbouring section. The parser's headings are
+    # the rulebook's real section titles, so sections are merged only when they're tiny.
+    chunk_min_tokens: int = 20
 
     # A section over the max is split into chunks of about the target size.
     chunk_target_tokens: int = 350

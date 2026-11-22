@@ -1,4 +1,4 @@
-"""The retrieval eval's Markdown reports: one parser's, and two parsers side by side."""
+"""The retrieval eval's Markdown report."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -9,16 +9,15 @@ from app.evaluation.retrieval import QuestionResult
 
 
 @dataclass(frozen=True)
-class ParserResults:
-    """Every golden question searched in one parser's eval database, without and with reranking."""
+class EvalRun:
+    """Every golden question searched in the eval database, without and with reranking."""
 
-    parser: str
     chunk_count: int
     hybrid: list[QuestionResult]
     reranked: list[QuestionResult]
 
 
-# One question's results from two searches, or from two parsers' databases.
+# One question's results from two searches.
 _Pair = tuple[QuestionResult, QuestionResult]
 
 _HIT_NOTE = (
@@ -86,14 +85,13 @@ def _top(result: QuestionResult) -> str:
     )
 
 
-def format_report(results: ParserResults, settings: Settings, now: datetime) -> str:
+def format_report(results: EvalRun, settings: Settings, now: datetime) -> str:
     """Scores without and with reranking for all, each game and each tag; each question's top."""
     k = settings.search_results
     pairs = list(zip(results.hybrid, results.reranked, strict=True))
     lines = [
         f"# Retrieval eval: {now:%Y-%m-%d %H:%M}",
         "",
-        f"- Parser: {results.parser}",
         *_search_lines(settings),
         f"- Chunks in the eval database: {results.chunk_count}",
         _HIT_NOTE,
@@ -111,59 +109,4 @@ def format_report(results: ParserResults, settings: Settings, now: datetime) -> 
             f"| {hybrid.question.id} | {_first_hit(hybrid.hits)} | {_first_hit(reranked.hits)} "
             f"| {_top(hybrid)} | {_top(reranked)} |"
         )
-    return "\n".join(lines) + "\n"
-
-
-def _differences(first: ParserResults, second: ParserResults) -> list[str]:
-    rows: list[str] = []
-    results = zip(first.hybrid, second.hybrid, first.reranked, second.reranked, strict=True)
-    for first_hybrid, second_hybrid, first_reranked, second_reranked in results:
-        ranks = [
-            _first_hit(result.hits)
-            for result in (first_hybrid, second_hybrid, first_reranked, second_reranked)
-        ]
-        if ranks[0] != ranks[1] or ranks[2] != ranks[3]:
-            rows.append(f"| {first_hybrid.question.id} | {' | '.join(ranks)} |")
-    return rows
-
-
-def format_comparison(
-    first: ParserResults, second: ParserResults, settings: Settings, now: datetime
-) -> str:
-    """Two parsers' scores side by side for each search, and the questions whose first hit moved."""
-    k = settings.search_results
-    names = (first.parser, second.parser)
-    differences = _differences(first, second)
-    lines = [
-        f"# Parser comparison: {now:%Y-%m-%d %H:%M}",
-        "",
-        f"- Parsers: {first.parser} ({first.chunk_count} chunks), "
-        f"{second.parser} ({second.chunk_count} chunks)",
-        *_search_lines(settings),
-        _HIT_NOTE,
-        "",
-        "## Hybrid search",
-        "",
-        *_score_table(names, list(zip(first.hybrid, second.hybrid, strict=True)), k),
-        "",
-        "## Reranked",
-        "",
-        *_score_table(names, list(zip(first.reranked, second.reranked, strict=True)), k),
-        "",
-        "## Questions that differ",
-        "",
-    ]
-    if not differences:
-        lines.append("Every question's first hit is at the same rank for both parsers.")
-        return "\n".join(lines) + "\n"
-
-    lines += [
-        "The rank of each search's first hit (– = none in the top "
-        f"{k}); each parser's own report lists its top {k}.",
-        "",
-        f"| Question | {first.parser} hybrid | {second.parser} hybrid "
-        f"| {first.parser} reranked | {second.parser} reranked |",
-        "| --- | --: | --: | --: | --: |",
-        *differences,
-    ]
     return "\n".join(lines) + "\n"

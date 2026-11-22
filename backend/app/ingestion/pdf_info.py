@@ -28,14 +28,6 @@ def page_texts(path: Path) -> list[str]:
         return [cast(str, page.get_text()) for page in doc.pages()]
 
 
-def low_text_pages(path: Path, min_chars: int) -> list[int]:
-    return [
-        number
-        for number, text in enumerate(page_texts(path), start=1)
-        if len(text.strip()) < min_chars
-    ]
-
-
 def render_page(path: Path, page: int, long_side_px: int) -> bytes:
     """Render one page (numbered from 1) as a PNG whose longer side is `long_side_px` pixels."""
     with pymupdf.open(path) as doc:  # type: ignore[no-untyped-call]

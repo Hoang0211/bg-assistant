@@ -19,11 +19,11 @@ logger = logging.getLogger(__name__)
 
 
 def _chunk_and_embed(
-    elements: list[Element], min_tokens: int, embedder: Embedder
+    elements: list[Element], embedder: Embedder
 ) -> tuple[list[TextChunk], list[list[float]]]:
     settings = get_settings()
     limits = ChunkLimits(
-        min_tokens=min_tokens,
+        min_tokens=settings.chunk_min_tokens,
         target_tokens=settings.chunk_target_tokens,
         max_tokens=settings.chunk_max_tokens,
         overlap_tokens=settings.chunk_overlap_tokens,
@@ -54,7 +54,7 @@ async def ingest_rulebook(
 
     New Markdown from the parser is stored as soon as the parse ends, so a later failure doesn't
     lose it; a parse that returns none leaves the stored copy as it is. With `reparse`, the
-    parser isn't given the stored copy, so the LLM parser reads the pages again.
+    parser isn't given the stored copy, so it reads the pages again.
     """
     rulebook = await session.get(Rulebook, rulebook_id)
     if rulebook is None:
@@ -85,10 +85,8 @@ async def ingest_rulebook(
             )
             await session.commit()
 
-        chunks, vectors = await asyncio.to_thread(
-            _chunk_and_embed, parsed.elements, parser.chunk_min_tokens, embedder
-        )
-        report = build_report(parsed.elements, len(chunks), rulebook.page_count, parsed.ocr_pages)
+        chunks, vectors = await asyncio.to_thread(_chunk_and_embed, parsed.elements, embedder)
+        report = build_report(parsed.elements, len(chunks), rulebook.page_count)
         # Lock the rulebook until the commit, so a move waits and another ingestion of it can't
         # write its chunks at the same time; and read its game now, not from before the parse.
         game_id = await session.scalar(
