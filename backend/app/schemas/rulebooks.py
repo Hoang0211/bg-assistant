@@ -10,7 +10,6 @@ class ParseReportRead(BaseModel):
     """How well a rulebook parsed; the UI shows warnings for the listed pages."""
 
     chunk_count: int
-    ocr_pages: list[int]
     empty_pages: list[int]
 
 

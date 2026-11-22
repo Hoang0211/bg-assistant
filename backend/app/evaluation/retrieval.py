@@ -9,8 +9,7 @@ from app.db.models import Chunk, Game, Rulebook
 from app.evaluation.metrics import Place, is_hit, ndcg, recall, reciprocal_rank
 from app.evaluation.questions import GoldenQuestion
 from app.ingestion.embedder import Embedder
-from app.retrieval.reranker import Reranker
-from app.retrieval.search import search
+from app.retrieval.hybrid import hybrid_search
 
 
 @dataclass(frozen=True)
@@ -49,14 +48,13 @@ async def _places(session: AsyncSession, game_ids: list[int]) -> dict[int, Place
 async def evaluate_question(
     session: AsyncSession,
     embedder: Embedder,
-    reranker: Reranker | None,
     question: GoldenQuestion,
     k: int,
 ) -> QuestionResult:
     """Search the question's game family and score the top k results."""
     game_ids = await family_game_ids(session, question.game)
     places = await _places(session, game_ids)
-    results = await search(session, embedder, reranker, question.question, game_ids, limit=k)
+    results = await hybrid_search(session, embedder, question.question, game_ids, limit=k)
     top = [places[result.chunk_id] for result in results]
     hits = [is_hit(place, question.expected) for place in top]
     relevant_count = sum(is_hit(place, question.expected) for place in places.values())

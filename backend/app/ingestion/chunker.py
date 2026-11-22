@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from itertools import groupby
 
 from app.db.models import ChunkType
-from app.ingestion.elements import Element, ElementKind
+from app.ingestion.elements import PATH_SEPARATOR, Element, ElementKind
 
 
 @dataclass(frozen=True)
@@ -35,10 +35,13 @@ _Section = tuple[str, list[Element]]
 _GLOSSARY_ENTRY = re.compile(r"[A-Z][^.:!?]{0,40}: \S")
 _MIN_GLOSSARY_ENTRIES = 4
 
-# Headings of sections about who made the game, not how to play it.
-_CREDITS_HEADING = re.compile(
-    r"credits|.*acknowledge?ments?|playtesters|.*\binc\.?|www\..*", re.IGNORECASE
-)
+# Titles of sections about who made the game, not how to play it. Their subsections (Game
+# Design, Illustrations) are about that too, so they're dropped with them.
+_CREDITS_TITLE = re.compile(r"credits|.*acknowledge?ments?|playtesters", re.IGNORECASE)
+
+# A publisher's name or a web address used as a heading. It's often cover or footer text that
+# the rules sit under, so only its own section is dropped, never its subsections.
+_MAKER_HEADING = re.compile(r".*\binc\.?|www\..*", re.IGNORECASE)
 
 
 def _content(section: list[Element]) -> str:
@@ -50,16 +53,20 @@ def _last_page(element: Element) -> int:
 
 
 def _continues(previous: Element, element: Element) -> bool:
+    # The rest of a cut sentence starts with a lowercase letter or a digit; a capital, or
+    # Markdown such as "**Example:**", "> Note" or "[wood]", starts something new.
+    first = element.text[0]
     return (
         previous.kind in (ElementKind.PARAGRAPH, ElementKind.LIST_ITEM)
         and element.kind == ElementKind.PARAGRAPH
         and element.page == _last_page(previous) + 1
         and not previous.text.endswith((".", "!", "?", ":"))
-        and not element.text[0].isupper()
+        and (first.islower() or first.isdigit())
     )
 
 
-def _join_page_breaks(elements: list[Element]) -> list[Element]:
+def join_page_breaks(elements: list[Element]) -> list[Element]:
+    """Join a paragraph to the one before it when a page break cut it in two."""
     joined: list[Element] = []
     for element in elements:
         if joined and _continues(joined[-1], element):
@@ -128,41 +135,55 @@ def _split_long_section(
     return parts
 
 
+def _is_credits(path: str) -> bool:
+    headings = path.split(PATH_SEPARATOR)
+    return any(_CREDITS_TITLE.fullmatch(heading) for heading in headings) or bool(
+        _MAKER_HEADING.fullmatch(headings[-1])
+    )
+
+
 def _drop_credits(elements: list[Element]) -> list[Element]:
     kept: list[Element] = []
     dropping = False
     for element in elements:
         if element.kind == ElementKind.HEADING:
-            dropping = bool(_CREDITS_HEADING.fullmatch(element.text))
+            dropping = _is_credits(element.text)
         if not dropping:
             kept.append(element)
     return kept
 
 
-def _pull_out_tables(elements: list[Element]) -> tuple[list[Element], list[tuple[str, Element]]]:
+def _pull_out_tables(
+    elements: list[Element],
+) -> tuple[list[Element], list[tuple[str, str, Element]]]:
     text: list[Element] = []
-    tables: list[tuple[str, Element]] = []
+    tables: list[tuple[str, str, Element]] = []  # each table's heading, caption and table
     heading = ""
     for element in elements:
         if element.kind == ElementKind.HEADING:
             heading = element.text
-        if element.kind == ElementKind.TABLE:
-            tables.append((heading, element))
-        else:
+        if element.kind != ElementKind.TABLE:
             text.append(element)
+            continue
+
+        # A caption right above a table names it, so it moves into the table's chunk.
+        caption = ""
+        if text and text[-1].kind == ElementKind.CAPTION and text[-1].page == element.page:
+            caption = text.pop().text
+        tables.append((heading, caption, element))
     return text, tables
 
 
 def _split_long_table(
-    heading: str, table: str, count_tokens: Callable[[str], int], limits: ChunkLimits
+    prefix: str, table: str, count_tokens: Callable[[str], int], limits: ChunkLimits
 ) -> list[str]:
-    whole = f"{heading}\n\n{table}" if heading else table
+    whole = f"{prefix}\n\n{table}" if prefix else table
     if count_tokens(whole) <= limits.max_tokens:
         return [whole]
 
     lines = table.split("\n")
     header = "\n".join(lines[:2])
-    top = f"{heading}\n\n{header}" if heading else header
+    top = f"{prefix}\n\n{header}" if prefix else header
     limit = limits.target_tokens - count_tokens(top)
     rows = [piece for row in lines[2:] for piece in _split_at_words(row, count_tokens, limit)]
 
@@ -258,7 +279,7 @@ def chunk_elements(
     elements: list[Element], count_tokens: Callable[[str], int], limits: ChunkLimits
 ) -> list[TextChunk]:
     """Split parsed elements at headings, then merge small sections and split long ones."""
-    text, tables = _pull_out_tables(_drop_credits(_join_page_breaks(elements)))
+    text, tables = _pull_out_tables(_drop_credits(join_page_breaks(elements)))
     text, entries = _pull_out_glossary(text)
     merged = _merge_small_sections(_split_at_headings(text), count_tokens, limits.min_tokens)
     sections = [
@@ -268,8 +289,9 @@ def chunk_elements(
     ]
     chunks = [_to_chunk(heading, section, ChunkType.SECTION) for heading, section in sections]
 
-    for heading, table in tables:
-        for content in _split_long_table(heading, table.text, count_tokens, limits):
+    for heading, caption, table in tables:
+        prefix = "\n\n".join(part for part in (heading, caption) if part)
+        for content in _split_long_table(prefix, table.text, count_tokens, limits):
             chunks.append(
                 TextChunk(
                     section_path=heading,

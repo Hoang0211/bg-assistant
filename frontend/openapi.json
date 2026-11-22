@@ -1075,13 +1075,6 @@
             "type": "integer",
             "title": "Chunk Count"
           },
-          "ocr_pages": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
-            "title": "Ocr Pages"
-          },
           "empty_pages": {
             "items": {
               "type": "integer"
@@ -1093,7 +1086,6 @@
         "type": "object",
         "required": [
           "chunk_count",
-          "ocr_pages",
           "empty_pages"
         ],
         "title": "ParseReportRead",

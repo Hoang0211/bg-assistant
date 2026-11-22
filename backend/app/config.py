@@ -1,7 +1,11 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.llm.base import ReasoningEffort
 
 
 class Settings(BaseSettings):
@@ -23,23 +27,19 @@ class Settings(BaseSettings):
     eval_dir: Path = Path("eval")
     eval_rulebooks_dir: Path = Path("data/rulebooks")
 
+    # A page with fewer characters in its text layer (scanned or nearly blank) has nothing for
+    # just eval-text to compare the Markdown with, so it isn't checked.
+    eval_text_min_page_chars: int = 100
+
     # Largest rulebook PDF accepted, in MB.
     max_upload_mb: int = 50
-
-    # Pages with fewer characters in their text layer are parsed with OCR.
-    ocr_min_page_chars: int = 100
-
-    # Times the parse is tried in its own process before the rulebook is marked as failed.
-    parse_attempts: int = 3
-
-    # A parse that runs longer than this is stopped and not tried again.
-    parse_timeout_seconds: int = 600
 
     # Off in tests, so starting the app there doesn't ingest rulebooks from the dev database.
     run_ingestion_worker: bool = True
 
-    # Sections with fewer tokens are merged into a neighbouring section.
-    chunk_min_tokens: int = 80
+    # Sections with fewer tokens are merged into a neighbouring section. The parser's headings are
+    # the rulebook's real section titles, so sections are merged only when they're tiny.
+    chunk_min_tokens: int = 20
 
     # A section over the max is split into chunks of about the target size.
     chunk_target_tokens: int = 350
@@ -52,18 +52,49 @@ class Settings(BaseSettings):
     # vector size differs.
     embedding_model: str = "BAAI/bge-base-en-v1.5"
 
-    # Hybrid search: candidates kept from vector and from full-text search, Reciprocal Rank
-    # Fusion's k, and how many fused chunks go on to the reranker.
+    # Hybrid search: candidates kept from vector and from full-text search, and Reciprocal Rank
+    # Fusion's k.
     vector_candidates: int = 30
     full_text_candidates: int = 30
     rrf_k: int = 60
-    fused_candidates: int = 20
-
-    # Cross-encoder from Hugging Face that reranks the fused chunks.
-    reranker_model: str = "BAAI/bge-reranker-base"
 
     # Chunks a search returns: the ones sent to the LLM, and the ones the eval scores.
     search_results: int = 5
+
+    # "openai", or "fake" for scripted replies with no API key (tests always use it).
+    llm_provider: Literal["openai", "fake"] = "openai"
+    openai_api_key: SecretStr = SecretStr("")  # set in .env only
+
+    # Seconds before a request to the LLM is given up and retried.
+    llm_timeout_seconds: float = 120
+
+    # Times the SDK retries a call after a rate limit, a server error or a dropped connection,
+    # waiting longer before each try.
+    llm_max_retries: int = 2
+
+    # The vision model that writes each rulebook page as Markdown, and its reasoning effort.
+    # The output cap is a spending guard: the densest page tried needed about 1,900 tokens.
+    parser_model: str = "gpt-6.1-terra"
+    parser_reasoning_effort: ReasoningEffort = "low"
+    parser_max_output_tokens: int = 4000
+
+    # Each page is rendered so its longer side is this many pixels: enough for the densest page
+    # tried, at about 3,300 input tokens a page.
+    parser_image_px: int = 2048
+
+    # The model that answers rules questions from the retrieved chunks, as chat will, and the one
+    # that grades the eval's answers against the golden answers. The output caps are spending
+    # guards: they include the reasoning tokens.
+    chat_model: str = "gpt-6.1-terra"
+    chat_reasoning_effort: ReasoningEffort = "low"
+    chat_max_output_tokens: int = 1500
+    judge_model: str = "gpt-6.1-sol"
+    judge_reasoning_effort: ReasoningEffort = "low"
+    judge_max_output_tokens: int = 800
+
+    # The answer check's full answers quote the rulebooks, so they're written here, git-ignored,
+    # instead of to the committed reports.
+    eval_answers_dir: Path = Path("data/answer-checks")
 
     # Lists frontend origins allowed to call API from browser
     cors_origins: list[str] = ["http://localhost:3000"]

@@ -20,5 +20,8 @@
   "evenBetterToml.formatter.arrayAutoCollapse": false,
   "python.terminal.activateEnvironment": false,
   "python.analysis.typeCheckingMode": "standard",
-  "js/ts.preferences.importModuleSpecifier": "non-relative"
+  "js/ts.preferences.importModuleSpecifier": "non-relative",
+  "files.associations": {
+    "justfile": "plaintext"
+  }
 }

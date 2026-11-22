@@ -62,17 +62,14 @@ async def test_list_game_rulebooks_returns_the_parse_report(
     rulebook = await add_rulebook(api_client, game["id"], make_pdf(1))
     stored = await db_session.get(Rulebook, rulebook["id"])
     assert stored is not None
+    # Reports stored while Docling parsed also list OCR pages, which the API leaves out.
     stored.parse_report = {"chunk_count": 3, "ocr_pages": [1], "empty_pages": []}
     await db_session.flush()
 
     response = await api_client.get(f"/api/games/{game['id']}/rulebooks")
 
     assert response.status_code == 200
-    assert response.json()[0]["parse_report"] == {
-        "chunk_count": 3,
-        "ocr_pages": [1],
-        "empty_pages": [],
-    }
+    assert response.json()[0]["parse_report"] == {"chunk_count": 3, "empty_pages": []}
 
 
 async def test_list_game_rulebooks_returns_404_for_an_unknown_game(api_client: AsyncClient) -> None:

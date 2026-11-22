@@ -146,7 +146,7 @@ async def test_hybrid_search_returns_fused_chunks_with_their_games_current_name(
     base.name = "Catan (renamed)"
     await db_session.flush()
 
-    results = await hybrid_search(db_session, embedder, "ships", [base.id, expansion.id])
+    results = await hybrid_search(db_session, embedder, "ships", [base.id, expansion.id], limit=5)
 
     assert results == [
         SearchResult(
@@ -170,3 +170,17 @@ async def test_hybrid_search_returns_fused_chunks_with_their_games_current_name(
             content="Ships sail.",
         ),
     ]
+
+
+async def test_hybrid_search_returns_only_the_best_chunks_up_to_the_limit(
+    db_session: AsyncSession,
+) -> None:
+    embedder = FakeEmbedder()
+    game, rulebook = await _add_game(db_session, "Catan")
+    query_vector = embedder.embed_query("ships")
+    best = await _add_chunk(db_session, rulebook, "Ships carry trade.", query_vector)
+    await _add_chunk(db_session, rulebook, "Ships sail.", _vector(0, 1))
+
+    results = await hybrid_search(db_session, embedder, "ships", [game.id], limit=1)
+
+    assert [result.chunk_id for result in results] == [best.id]

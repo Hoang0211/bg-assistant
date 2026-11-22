@@ -79,6 +79,11 @@ test-frontend:
     npm run test
     npm run test:storybook
 
+# Run the tests that call OpenAI (a few cents; needs OPENAI_API_KEY in backend/.env).
+[working-directory: 'backend']
+test-live:
+    uv run --env-file .env pytest -m live --force-enable-socket
+
 # Run the Playwright end-to-end tests (starts the database first).
 [working-directory: 'frontend']
 e2e: db
@@ -97,24 +102,39 @@ gen-types:
     uv run python -m app.export_openapi ../frontend/openapi.json
     npm --prefix ../frontend run gen:api
 
-# Download the embedding and Docling models (about 1 GB, once per machine; the tests need them).
+# Download the embedding model (about 0.5 GB, once per machine; the tests need it).
 [working-directory: 'backend']
 download-models:
     uv run python -m app.ingestion.download_models
 
 # --- Engine ---
 
-# Parse, chunk and embed the stored rulebooks again: `just reindex`, or `just reindex --game 3`.
+# Parse, chunk and embed the stored rulebooks again: `just reindex`, `just reindex --game 3`;
+# `--reparse` makes the model read the pages again instead of using the stored Markdown (paid).
 [working-directory: 'backend']
 reindex *args:
     uv run python -m app.cli reindex {{args}}
 
-# Build the eval database from backend/eval/library.json and ingest its rulebooks (about 10 minutes).
+# Build the eval database from backend/eval/library.json and ingest its rulebooks; stored Markdown
+# is reused, and `just eval-ingest --reparse` makes the model read every page again (paid).
 [working-directory: 'backend']
-eval-ingest:
-    uv run python -m app.cli eval-ingest
+eval-ingest *args:
+    uv run python -m app.cli eval-ingest {{args}}
 
 # Search the eval database for each golden question and write a report to backend/eval/reports/.
 [working-directory: 'backend']
 eval:
     uv run python -m app.cli eval
+
+# Compare the eval database's Markdown with each PDF page's text layer and write a report to
+# backend/eval/reports/; the least-kept pages' missing and added words are printed, not saved.
+[working-directory: 'backend']
+eval-text:
+    uv run python -m app.cli eval-text
+
+# Answer each golden question from its top chunks and grade the answers, which spends OpenAI
+# credit (about $0.10); the report goes to backend/eval/reports/, the full answers to the
+# git-ignored backend/data/answer-checks/.
+[working-directory: 'backend']
+eval-answers:
+    uv run python -m app.cli eval-answers

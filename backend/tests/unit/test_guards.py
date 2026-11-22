@@ -29,7 +29,7 @@ def test_app_startup_imports_no_heavy_library() -> None:
     # A new process, because in a full test run other test files have already loaded these.
     code = (
         "import sys, app.main; "
-        "heavy = ('docling', 'sentence_transformers', 'torch'); "
+        "heavy = ('sentence_transformers', 'torch'); "
         "print([name for name in heavy if name in sys.modules])"
     )
     result = subprocess.run(

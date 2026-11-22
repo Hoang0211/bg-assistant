@@ -4,7 +4,7 @@ import pymupdf
 import pytest
 from pymupdf import mupdf
 
-from app.ingestion.pdf_info import InvalidPdfError, low_text_pages, read_page_count
+from app.ingestion.pdf_info import InvalidPdfError, page_texts, read_page_count, render_page
 from tests.helpers import add_text_page, make_pdf
 
 
@@ -28,12 +28,27 @@ def test_read_page_count_rejects_a_password_protected_pdf() -> None:
         read_page_count(data)
 
 
-def test_low_text_pages_returns_the_pages_under_the_limit(tmp_path: Path) -> None:
+def test_page_texts_returns_each_pages_text_layer(tmp_path: Path) -> None:
     doc = pymupdf.open()  # type: ignore[no-untyped-call]
     add_text_page(doc, "Setup", ["Players take turns in clockwise order."])
     doc.new_page()
     path = tmp_path / "rules.pdf"
     doc.save(path)  # type: ignore[no-untyped-call]
 
-    assert low_text_pages(path, min_chars=10) == [2]
-    assert low_text_pages(path, min_chars=1000) == [1, 2]
+    assert page_texts(path) == ["Setup\nPlayers take turns in clockwise order.\n", ""]
+
+
+@pytest.mark.parametrize(("page", "size"), [(1, (1448, 2048)), (2, (2048, 1448))])
+def test_render_page_renders_the_page_with_its_longer_side_at_the_size(
+    tmp_path: Path, page: int, size: tuple[int, int]
+) -> None:
+    doc = pymupdf.open()  # type: ignore[no-untyped-call]
+    doc.new_page()  # A4 portrait: 595 x 842 points
+    doc.new_page(width=842, height=595)
+    path = tmp_path / "rules.pdf"
+    doc.save(path)  # type: ignore[no-untyped-call]
+
+    png = render_page(path, page, long_side_px=2048)
+    pixmap = pymupdf.Pixmap(png)  # type: ignore[no-untyped-call]
+
+    assert (pixmap.width, pixmap.height) == size

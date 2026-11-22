@@ -675,6 +675,24 @@ def test_chunk_elements_keeps_the_page_range_when_splitting_a_joined_paragraph()
     ]
 
 
+@pytest.mark.parametrize("text", ["**Example:** Anna rolls a 7.", "> Keep it hidden.", "[wood]"])
+def test_chunk_elements_does_not_join_text_that_starts_with_markdown(text: str) -> None:
+    elements = [
+        Element(ElementKind.LIST_ITEM, "- Draw 2 cards", 5),
+        Element(ElementKind.PARAGRAPH, text, 6),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.SECTION,
+            page_start=5,
+            page_end=6,
+            content=f"- Draw 2 cards\n\n{text}",
+        ),
+    ]
+
+
 def test_chunk_elements_does_not_join_text_that_starts_with_a_capital() -> None:
     elements = [
         Element(ElementKind.PARAGRAPH, "Grimm Edition", 1),
@@ -891,6 +909,129 @@ def test_chunk_elements_splits_a_long_table_row_between_words() -> None:
             page_start=3,
             page_end=3,
             content=f"{HEADER}\nfour five six |",
+        ),
+    ]
+
+
+def test_chunk_elements_puts_a_caption_right_above_a_table_in_its_chunk() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Costs", 3),
+        Element(ElementKind.PARAGRAPH, "Pay first.", 3),
+        Element(ElementKind.CAPTION, "Building costs", 3),
+        Element(ElementKind.TABLE, TABLE, 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.SECTION,
+            page_start=3,
+            page_end=3,
+            content="Costs\n\nPay first.",
+        ),
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\nBuilding costs\n\n{TABLE}",
+        ),
+    ]
+
+
+def test_chunk_elements_puts_a_caption_in_a_table_chunk_with_no_heading() -> None:
+    elements = [
+        Element(ElementKind.CAPTION, "Building costs", 3),
+        Element(ElementKind.TABLE, TABLE, 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Building costs\n\n{TABLE}",
+        ),
+    ]
+
+
+def test_chunk_elements_repeats_a_tables_caption_in_each_piece() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Costs", 3),
+        Element(ElementKind.CAPTION, "Building costs", 3),
+        Element(
+            ElementKind.TABLE,
+            f"{HEADER}\n| Road | Brick |\n| City | Ore |\n| Farm | Wool |\n| Port | Clay |",
+            3,
+        ),
+    ]
+
+    assert chunk_elements(elements, count_words, limits(target_tokens=19, max_tokens=19)) == [
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\nBuilding costs\n\n{HEADER}\n| Road | Brick |\n| City | Ore |",
+        ),
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\nBuilding costs\n\n{HEADER}\n| Farm | Wool |\n| Port | Clay |",
+        ),
+    ]
+
+
+def test_chunk_elements_keeps_a_caption_on_an_earlier_page_in_its_section() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Costs", 2),
+        Element(ElementKind.CAPTION, "Building costs", 2),
+        Element(ElementKind.TABLE, TABLE, 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.SECTION,
+            page_start=2,
+            page_end=2,
+            content="Costs\n\nBuilding costs",
+        ),
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\n{TABLE}",
+        ),
+    ]
+
+
+def test_chunk_elements_keeps_a_caption_with_text_below_it_in_its_section() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Costs", 3),
+        Element(ElementKind.CAPTION, "Building costs", 3),
+        Element(ElementKind.PARAGRAPH, "Pay first.", 3),
+        Element(ElementKind.TABLE, TABLE, 3),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.SECTION,
+            page_start=3,
+            page_end=3,
+            content="Costs\n\nBuilding costs\n\nPay first.",
+        ),
+        TextChunk(
+            section_path="Costs",
+            chunk_type=ChunkType.TABLE,
+            page_start=3,
+            page_end=3,
+            content=f"Costs\n\n{TABLE}",
         ),
     ]
 
@@ -1399,6 +1540,55 @@ def test_chunk_elements_drops_sections_with_a_credits_heading(heading: str) -> N
             page_start=16,
             page_end=16,
             content="Variants\n\nPlay with two decks.",
+        ),
+    ]
+
+
+def test_chunk_elements_drops_the_subsections_of_a_credits_section() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Scoring", 15),
+        Element(ElementKind.PARAGRAPH, "Count your points.", 15),
+        Element(ElementKind.HEADING, "Credits", 16),
+        Element(ElementKind.HEADING, "Credits › Game Design", 16),
+        Element(ElementKind.PARAGRAPH, "Jane Doe", 16),
+        Element(ElementKind.HEADING, "Variants", 16),
+        Element(ElementKind.PARAGRAPH, "Play with open hands.", 16),
+    ]
+
+    sections = [chunk.section_path for chunk in chunk_elements(elements, count_words, limits())]
+
+    assert sections == ["Scoring", "Variants"]
+
+
+@pytest.mark.parametrize("maker", ["Bezier Games, Inc.", "www.beziergames.com"])
+def test_chunk_elements_keeps_the_subsections_of_a_publisher_or_web_heading(maker: str) -> None:
+    elements = [
+        Element(ElementKind.HEADING, maker, 1),
+        Element(ElementKind.PARAGRAPH, "Published 2024.", 1),
+        Element(ElementKind.HEADING, f"{maker} › Setup", 1),
+        Element(ElementKind.PARAGRAPH, "Deal 8 cards to each player.", 1),
+    ]
+
+    sections = [chunk.section_path for chunk in chunk_elements(elements, count_words, limits())]
+
+    assert sections == [f"{maker} › Setup"]
+
+
+def test_chunk_elements_drops_a_credits_section_under_a_parent_heading() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Rules › Scoring", 15),
+        Element(ElementKind.PARAGRAPH, "Count your points.", 15),
+        Element(ElementKind.HEADING, "Rules › Credits", 16),
+        Element(ElementKind.PARAGRAPH, "Art by Jane Doe.", 16),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="Rules › Scoring",
+            chunk_type=ChunkType.SECTION,
+            page_start=15,
+            page_end=15,
+            content="Rules › Scoring\n\nCount your points.",
         ),
     ]
 

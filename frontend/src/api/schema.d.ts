@@ -321,8 +321,6 @@ export interface components {
         ParseReportRead: {
             /** Chunk Count */
             chunk_count: number;
-            /** Ocr Pages */
-            ocr_pages: number[];
             /** Empty Pages */
             empty_pages: number[];
         };
