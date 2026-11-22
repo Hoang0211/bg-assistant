@@ -35,10 +35,13 @@ _Section = tuple[str, list[Element]]
 _GLOSSARY_ENTRY = re.compile(r"[A-Z][^.:!?]{0,40}: \S")
 _MIN_GLOSSARY_ENTRIES = 4
 
-# Headings of sections about who made the game, not how to play it.
-_CREDITS_HEADING = re.compile(
-    r"credits|.*acknowledge?ments?|playtesters|.*\binc\.?|www\..*", re.IGNORECASE
-)
+# Titles of sections about who made the game, not how to play it. Their subsections (Game
+# Design, Illustrations) are about that too, so they're dropped with them.
+_CREDITS_TITLE = re.compile(r"credits|.*acknowledge?ments?|playtesters", re.IGNORECASE)
+
+# A publisher's name or a web address used as a heading. It's often cover or footer text that
+# the rules sit under, so only its own section is dropped, never its subsections.
+_MAKER_HEADING = re.compile(r".*\binc\.?|www\..*", re.IGNORECASE)
 
 
 def _content(section: list[Element]) -> str:
@@ -132,14 +135,19 @@ def _split_long_section(
     return parts
 
 
+def _is_credits(path: str) -> bool:
+    headings = path.split(PATH_SEPARATOR)
+    return any(_CREDITS_TITLE.fullmatch(heading) for heading in headings) or bool(
+        _MAKER_HEADING.fullmatch(headings[-1])
+    )
+
+
 def _drop_credits(elements: list[Element]) -> list[Element]:
     kept: list[Element] = []
     dropping = False
     for element in elements:
         if element.kind == ElementKind.HEADING:
-            # Any part of the path, so a subsection under "Credits" goes with it.
-            headings = element.text.split(PATH_SEPARATOR)
-            dropping = any(_CREDITS_HEADING.fullmatch(heading) for heading in headings)
+            dropping = _is_credits(element.text)
         if not dropping:
             kept.append(element)
     return kept

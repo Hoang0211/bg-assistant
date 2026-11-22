@@ -1560,6 +1560,20 @@ def test_chunk_elements_drops_the_subsections_of_a_credits_section() -> None:
     assert sections == ["Scoring", "Variants"]
 
 
+@pytest.mark.parametrize("maker", ["Bezier Games, Inc.", "www.beziergames.com"])
+def test_chunk_elements_keeps_the_subsections_of_a_publisher_or_web_heading(maker: str) -> None:
+    elements = [
+        Element(ElementKind.HEADING, maker, 1),
+        Element(ElementKind.PARAGRAPH, "Published 2024.", 1),
+        Element(ElementKind.HEADING, f"{maker} › Setup", 1),
+        Element(ElementKind.PARAGRAPH, "Deal 8 cards to each player.", 1),
+    ]
+
+    sections = [chunk.section_path for chunk in chunk_elements(elements, count_words, limits())]
+
+    assert sections == [f"{maker} › Setup"]
+
+
 def test_chunk_elements_drops_a_credits_section_under_a_parent_heading() -> None:
     elements = [
         Element(ElementKind.HEADING, "Rules › Scoring", 15),
