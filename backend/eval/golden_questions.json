@@ -1,7 +1,7 @@
 {
   "about": "Golden questions for the retrieval eval, written from the rulebook PDFs before looking at any retrieval results. game is the game the question is asked about. expected lists where the answer is printed: each rulebook file with its PDF page numbers; a retrieved chunk from one of those rulebooks that overlaps one of its pages is a hit. answer is a short paraphrase, for checking by hand and for the answer judge in milestone 6. The PDFs are not committed: each file is matched to a rulebook with that filename in the library.",
   "tags": {
-    "picture-text": "the answer is inside a picture region; the PDF may have it as text, but Docling skips text inside pictures",
+    "picture-text": "the answer is inside a picture region, so the parser has to read it from the page image",
     "ocr": "the page is a scanned image with no text layer, so all its text comes from OCR",
     "table": "the answer is in a table",
     "callout": "the answer is in a box under a generic heading (Important, Example, Step 2)",

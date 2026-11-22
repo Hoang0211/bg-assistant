@@ -17,7 +17,7 @@ Ask questions about your board games' rules and get answers with page citations 
 
 - **Frontend:** Next.js (App Router), TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, Storybook
 - **Backend:** Python 3.12, FastAPI, SQLAlchemy (async), Alembic, LangGraph
-- **Data and ML:** PostgreSQL with pgvector and pg_trgm, BAAI bge embeddings and reranker, Docling, OpenAI, LangSmith
+- **Data and ML:** PostgreSQL with pgvector and pg_trgm, BAAI bge embeddings, OpenAI (vision-model PDF parsing, structured outputs), PyMuPDF, LangSmith
 - **Quality:** pytest, Vitest, React Testing Library, MSW, Playwright, Ruff, mypy, ESLint, Prettier, pre-commit, GitHub Actions
 
 ## Getting started
