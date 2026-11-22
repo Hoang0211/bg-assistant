@@ -102,7 +102,7 @@ gen-types:
     uv run python -m app.export_openapi ../frontend/openapi.json
     npm --prefix ../frontend run gen:api
 
-# Download the embedding and reranker models (about 1 GB, once per machine; the tests need them).
+# Download the embedding model (about 0.5 GB, once per machine; the tests need it).
 [working-directory: 'backend']
 download-models:
     uv run python -m app.ingestion.download_models

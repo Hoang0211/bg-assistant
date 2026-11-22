@@ -8,7 +8,6 @@ from app.evaluation.metrics import Place
 from app.evaluation.questions import ExpectedPlace, GoldenQuestion
 from app.evaluation.retrieval import QuestionResult, evaluate_question, family_game_ids
 from app.ingestion.embedder import FakeEmbedder
-from app.retrieval.reranker import FakeReranker
 
 QUESTION = GoldenQuestion(
     id="q-1",
@@ -62,11 +61,11 @@ async def _add_chunk(
 
 
 async def _add_ranked_chunks(db_session: AsyncSession, embedder: FakeEmbedder) -> None:
-    """A miss and two hits that hybrid search and the fake reranker order differently."""
+    """A miss and two hits, which hybrid search ranks miss first."""
     query = embedder.embed_query(QUESTION.question)
     _, rulebook = await _add_game(db_session, "Base")
     # Hybrid search ranks them by distance to the query: the miss, then one hit, then the other.
-    # Full-text search drops "Who is it?" as all stop words; the fake reranker counts "who".
+    # Full-text search drops "Who is it?" as all stop words, so only the distance counts.
     await _add_chunk(db_session, rulebook, (5, 5), "Setup.", query)
     await _add_chunk(
         db_session, rulebook, (2, 3), "Who is it?", [1.0, *[0.0] * (EMBEDDING_DIMENSION - 1)]
@@ -100,7 +99,7 @@ async def test_evaluate_question_scores_the_top_k_results(db_session: AsyncSessi
     embedder = FakeEmbedder()
     await _add_ranked_chunks(db_session, embedder)
 
-    result = await evaluate_question(db_session, embedder, None, QUESTION, k=2)
+    result = await evaluate_question(db_session, embedder, QUESTION, k=2)
 
     assert result == QuestionResult(
         question=QUESTION,
@@ -109,22 +108,4 @@ async def test_evaluate_question_scores_the_top_k_results(db_session: AsyncSessi
         recall=1.0,
         reciprocal_rank=0.5,
         ndcg=HIT_AT_2 / (1 + HIT_AT_2),
-    )
-
-
-async def test_evaluate_question_scores_the_reranked_results_with_a_reranker(
-    db_session: AsyncSession,
-) -> None:
-    embedder = FakeEmbedder()
-    await _add_ranked_chunks(db_session, embedder)
-
-    result = await evaluate_question(db_session, embedder, FakeReranker(), QUESTION, k=2)
-
-    assert result == QuestionResult(
-        question=QUESTION,
-        places=[Place("Base.pdf", 2, 3), Place("Base.pdf", 5, 5)],
-        hits=[True, False],
-        recall=1.0,
-        reciprocal_rank=1.0,
-        ndcg=1 / (1 + HIT_AT_2),
     )

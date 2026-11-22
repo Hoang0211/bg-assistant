@@ -22,7 +22,7 @@ from app.evaluation.answers import (
 from app.evaluation.database import create_database_if_missing, eval_database_url, migrate
 from app.evaluation.library import load_library, read_library
 from app.evaluation.questions import read_questions
-from app.evaluation.report import EvalRun, format_report
+from app.evaluation.report import format_report
 from app.evaluation.retrieval import evaluate_question
 from app.evaluation.text_overlap import (
     RulebookOverlap,
@@ -35,7 +35,6 @@ from app.ingestion.parsers import LlmParser, RulebookParser
 from app.ingestion.pipeline import ingest_rulebook
 from app.llm.base import create_llm_provider
 from app.log_setup import configure_logging
-from app.retrieval.reranker import BgeReranker
 
 
 async def reindex(
@@ -160,28 +159,21 @@ def _write_report(settings: Settings, name: str, report: str) -> None:
 
 
 async def _eval(settings: Settings) -> int:
-    """Score each golden question's search results, without and with reranking; write the report."""
+    """Score each golden question's search results and write the report."""
     questions = read_questions(settings.eval_dir / "golden_questions.json")
     embedder = BgeEmbedder(settings.embedding_model)
-    reranker = BgeReranker(settings.reranker_model)
     engine = create_db_engine(settings)
     try:
         async with create_sessionmaker(engine)() as session:
-            hybrid = [
-                await evaluate_question(session, embedder, None, question, settings.search_results)
-                for question in questions
-            ]
-            reranked = [
-                await evaluate_question(
-                    session, embedder, reranker, question, settings.search_results
-                )
+            results = [
+                await evaluate_question(session, embedder, question, settings.search_results)
                 for question in questions
             ]
             chunk_count = await session.scalar(select(func.count()).select_from(Chunk))
     finally:
         await engine.dispose()
     now = datetime.now()
-    report = format_report(EvalRun(chunk_count or 0, hybrid, reranked), settings, now)
+    report = format_report(results, chunk_count or 0, settings, now)
     _write_report(settings, f"{now:%Y-%m-%d-%H%M}-retrieval.md", report)
     return 0
 

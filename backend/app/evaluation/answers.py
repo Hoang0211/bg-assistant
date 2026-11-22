@@ -13,8 +13,7 @@ from app.evaluation.questions import GoldenQuestion
 from app.evaluation.retrieval import family_game_ids
 from app.ingestion.embedder import Embedder
 from app.llm.base import Completion, LLMProvider, StructuredCompletion
-from app.retrieval.hybrid import SearchResult
-from app.retrieval.search import search
+from app.retrieval.hybrid import SearchResult, hybrid_search
 
 logger = logging.getLogger(__name__)
 
@@ -134,8 +133,8 @@ async def check_answer(
 ) -> AnswerResult:
     """Search the question's game family with hybrid search, answer from the top, judge it."""
     game_ids = await family_game_ids(session, question.game)
-    results = await search(
-        session, embedder, None, question.question, game_ids, limit=settings.search_results
+    results = await hybrid_search(
+        session, embedder, question.question, game_ids, limit=settings.search_results
     )
     answer = await answer_question(llm, settings, question.question, results)
     if not answer.complete:

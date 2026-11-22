@@ -52,15 +52,11 @@ class Settings(BaseSettings):
     # vector size differs.
     embedding_model: str = "BAAI/bge-base-en-v1.5"
 
-    # Hybrid search: candidates kept from vector and from full-text search, Reciprocal Rank
-    # Fusion's k, and how many fused chunks go on to the reranker.
+    # Hybrid search: candidates kept from vector and from full-text search, and Reciprocal Rank
+    # Fusion's k.
     vector_candidates: int = 30
     full_text_candidates: int = 30
     rrf_k: int = 60
-    fused_candidates: int = 20
-
-    # Cross-encoder from Hugging Face that reranks the fused chunks.
-    reranker_model: str = "BAAI/bge-reranker-base"
 
     # Chunks a search returns: the ones sent to the LLM, and the ones the eval scores.
     search_results: int = 5

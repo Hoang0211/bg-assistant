@@ -87,13 +87,17 @@ async def _load(session: AsyncSession, chunk_ids: list[int]) -> list[SearchResul
 
 
 async def hybrid_search(
-    session: AsyncSession, embedder: Embedder, query: str, game_ids: list[int]
+    session: AsyncSession, embedder: Embedder, query: str, game_ids: list[int], limit: int
 ) -> list[SearchResult]:
-    """The fused candidates for a question, searching only the given games' chunks."""
+    """The given games' chunks that best answer the query, best first: what chat and the eval use.
+
+    Vector search and full-text search each pick their candidates, and Reciprocal Rank Fusion
+    merges the two rankings.
+    """
     settings = get_settings()
     # Embedding runs the model, so it's kept off the event loop.
     query_vector = await asyncio.to_thread(embedder.embed_query, query)
     vector_ids = await vector_search(session, query_vector, game_ids, settings.vector_candidates)
     text_ids = await full_text_search(session, query, game_ids, settings.full_text_candidates)
     fused = reciprocal_rank_fusion([vector_ids, text_ids], settings.rrf_k)
-    return await _load(session, fused[: settings.fused_candidates])
+    return await _load(session, fused[:limit])
