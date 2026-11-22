@@ -1,4 +1,4 @@
-"""Engine commands for the terminal: reindex, eval-ingest, eval and eval-text."""
+"""Engine commands for the terminal: reindex, eval-ingest, eval, eval-text and eval-answers."""
 
 import argparse
 import asyncio
@@ -13,6 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.config import Settings, get_settings
 from app.db.models import Chunk, Rulebook, RulebookStatus
 from app.db.session import create_db_engine, create_sessionmaker
+from app.evaluation.answers import (
+    AnswerResult,
+    ParserAnswers,
+    check_answer,
+    format_answer_details,
+    format_answer_report,
+)
 from app.evaluation.database import create_database_if_missing, eval_database_url, migrate
 from app.evaluation.library import load_library, read_library
 from app.evaluation.questions import read_questions
@@ -27,6 +34,7 @@ from app.evaluation.text_overlap import (
 from app.ingestion.embedder import BgeEmbedder, Embedder
 from app.ingestion.parsers import RulebookParser, create_parser
 from app.ingestion.pipeline import ingest_rulebook
+from app.llm.base import LLMProvider, create_llm_provider
 from app.log_setup import configure_logging
 from app.retrieval.reranker import BgeReranker, Reranker
 
@@ -106,6 +114,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     commands.add_parser(
         "eval-text", help="compare the LLM parser's Markdown with each PDF page's text layer"
+    )
+    commands.add_parser(
+        "eval-answers",
+        help="answer each golden question from each parser's chunks and grade it (paid)",
     )
     return parser
 
@@ -241,6 +253,46 @@ async def _eval_text(settings: Settings) -> int:
     return 0
 
 
+async def _answer_parser(settings: Settings, embedder: Embedder, llm: LLMProvider) -> ParserAnswers:
+    """Answer and grade every golden question from one parser's eval database, one at a time."""
+    questions = read_questions(settings.eval_dir / "golden_questions.json")
+    engine = create_db_engine(settings)
+    results: list[AnswerResult] = []
+    try:
+        async with create_sessionmaker(engine)() as session:
+            for question in questions:
+                result = await check_answer(session, embedder, llm, settings, question)
+                print(f"{settings.pdf_parser} {question.id}: {result.verdict}")
+                results.append(result)
+    finally:
+        await engine.dispose()
+    return ParserAnswers(settings.pdf_parser, results)
+
+
+async def _eval_answers(settings: Settings) -> int:
+    """Answer and grade each parser's results; write the report and, git-ignored, the answers."""
+    embedder = BgeEmbedder(settings.embedding_model)
+    llm = create_llm_provider(settings)
+    first, second = [
+        await _answer_parser(_eval_settings(settings, parser), embedder, llm) for parser in _PARSERS
+    ]
+    now = datetime.now()
+    _write_report(
+        settings,
+        f"{now:%Y-%m-%d-%H%M}-answers.md",
+        format_answer_report(first, second, settings, now),
+    )
+    details = settings.eval_answers_dir / f"{now:%Y-%m-%d-%H%M}-answers.md"
+    details.parent.mkdir(parents=True, exist_ok=True)
+    details.write_text(format_answer_details(first, second, now), encoding="utf-8")
+    print(f"wrote {details}")
+    results = first.results + second.results
+    input_tokens = sum(result.input_tokens for result in results)
+    output_tokens = sum(result.output_tokens for result in results)
+    print(f"used {input_tokens} input and {output_tokens} output tokens")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     configure_logging()
     args = _parser().parse_args(argv)
@@ -256,6 +308,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "eval-text":
         llm_settings = _eval_settings(settings, "llm")
         return asyncio.run(_eval_text(llm_settings), loop_factory=loop_factory)
+
+    if args.command == "eval-answers":
+        return asyncio.run(_eval_answers(settings), loop_factory=loop_factory)
 
     # Each parser's chunks are evaluated in their own database, so both stay ready to compare.
     eval_settings = _eval_settings(settings, args.parser or settings.pdf_parser)

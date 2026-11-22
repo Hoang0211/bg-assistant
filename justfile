@@ -132,3 +132,10 @@ eval *args:
 [working-directory: 'backend']
 eval-text:
     uv run python -m app.cli eval-text
+
+# Answer each golden question from each parser's top chunks and grade the answers, which spends
+# OpenAI credit (about $0.48); the report goes to backend/eval/reports/, the full answers to the
+# git-ignored backend/data/answer-checks/.
+[working-directory: 'backend']
+eval-answers:
+    uv run python -m app.cli eval-answers

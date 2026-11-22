@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Protocol
 
+from pydantic import BaseModel
+
 if TYPE_CHECKING:
     # Only for the annotation: config.py imports ReasoningEffort from here.
     from app.config import Settings
@@ -36,6 +38,13 @@ class Completion:
     usage: Usage
 
 
+@dataclass(frozen=True)
+class StructuredCompletion[T: BaseModel]:
+    value: T | None  # None when the reply was cut off or refused, so it has no object to give
+    complete: bool
+    usage: Usage
+
+
 class LLMProvider(Protocol):
     async def complete(
         self,
@@ -45,6 +54,18 @@ class LLMProvider(Protocol):
         max_output_tokens: int,
         reasoning_effort: ReasoningEffort,
     ) -> Completion: ...
+
+    async def complete_structured[T: BaseModel](
+        self,
+        model: str,
+        instructions: str,
+        parts: list[Part],
+        schema: type[T],
+        max_output_tokens: int,
+        reasoning_effort: ReasoningEffort,
+    ) -> StructuredCompletion[T]:
+        """A reply that the API guarantees matches the schema (OpenAI's structured outputs)."""
+        ...
 
 
 def create_llm_provider(settings: Settings) -> LLMProvider:

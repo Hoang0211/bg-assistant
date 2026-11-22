@@ -91,6 +91,20 @@ class Settings(BaseSettings):
     # tried, at about 3,300 input tokens a page.
     parser_image_px: int = 2048
 
+    # The model that answers rules questions from the retrieved chunks, as chat will, and the one
+    # that grades the eval's answers against the golden answers. The output caps are spending
+    # guards: they include the reasoning tokens.
+    chat_model: str = "gpt-6.1-terra"
+    chat_reasoning_effort: ReasoningEffort = "low"
+    chat_max_output_tokens: int = 1500
+    judge_model: str = "gpt-6.1-sol"
+    judge_reasoning_effort: ReasoningEffort = "low"
+    judge_max_output_tokens: int = 800
+
+    # The answer check's full answers quote the rulebooks, so they're written here, git-ignored,
+    # instead of to the committed reports.
+    eval_answers_dir: Path = Path("data/answer-checks")
+
     # Lists frontend origins allowed to call API from browser
     cors_origins: list[str] = ["http://localhost:3000"]
 
