@@ -30,6 +30,17 @@ async def test_llm_parser_writes_new_markdown_with_the_model(tmp_path: Path) -> 
     assert len(llm.calls) == 1
 
 
+async def test_llm_parser_calls_the_model_with_its_own_settings(tmp_path: Path) -> None:
+    path = tmp_path / "rules.pdf"
+    path.write_bytes(make_pdf(1))
+    llm = FakeLLMProvider(["# Setup"])
+    settings = Settings(parser_model="parser", parser_max_output_tokens=123)
+
+    await LlmParser(settings, llm).parse(path, 1, None)
+
+    assert [(call.model, call.max_output_tokens) for call in llm.calls] == [("parser", 123)]
+
+
 async def test_llm_parser_reuses_the_stored_markdown_without_the_model(tmp_path: Path) -> None:
     llm = FakeLLMProvider([])
 

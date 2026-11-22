@@ -15,6 +15,23 @@ def test_build_report_lists_pages_with_no_text() -> None:
     assert report == ParseReport(chunk_count=2, empty_pages=[2, 4])
 
 
+def test_build_report_counts_the_page_a_joined_sentence_ends_on_as_text() -> None:
+    report = build_report(
+        [
+            Element(
+                ElementKind.PARAGRAPH,
+                "When a 7 is rolled, players with more than 7 cards discard half.",
+                6,
+                last_page=7,
+            ),
+        ],
+        chunk_count=1,
+        page_count=8,
+    )
+
+    assert report.empty_pages == [1, 2, 3, 4, 5, 8]
+
+
 def test_build_report_counts_any_element_as_text() -> None:
     report = build_report(
         [

@@ -51,13 +51,18 @@ def compare_page(page: int, pdf_text: str, markdown: str) -> PageOverlap:
 
 
 def compare_rulebook(pdf_texts: list[str], markdown: str, min_chars: int) -> list[PageOverlap]:
-    """Compare each page whose text layer has at least `min_chars`; a scanned page has none."""
+    """Compare each page whose text layer has at least `min_chars` and some words in them.
+
+    A scanned page has no text layer, and one of symbols or unreadable glyphs has no words, so
+    neither has anything to compare with.
+    """
     pages = split_pages(markdown)
-    return [
+    overlaps = [
         compare_page(number, text, pages.get(number, ""))
         for number, text in enumerate(pdf_texts, start=1)
         if len(text.strip()) >= min_chars
     ]
+    return [overlap for overlap in overlaps if overlap.pdf_words]
 
 
 async def rulebook_overlaps(
@@ -108,7 +113,7 @@ def format_text_report(rulebooks: list[RulebookOverlap], min_chars: int, now: da
         " dropped text. Added: the Markdown's words the text layer doesn't have: changed or"
         " invented text, or text read from a picture that has no text layer.",
         f"- A page with under {min_chars} characters in its text layer (scanned or nearly"
-        " blank) has nothing to compare with and isn't checked.",
+        " blank), or with no words in it, has nothing to compare with and isn't checked.",
         "",
         "| Rulebook | Pages checked | Kept | Added words |",
         "| --- | --: | --: | --: |",

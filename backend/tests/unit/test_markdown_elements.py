@@ -88,6 +88,16 @@ def test_markdown_to_elements_keeps_a_partly_bold_block_as_a_paragraph(text: str
     assert markdown_to_elements(f"{text}\n") == [Element(ElementKind.PARAGRAPH, text, 1)]
 
 
+def test_markdown_to_elements_splits_a_table_from_the_lines_around_it_with_no_blank_line() -> None:
+    markdown = "**Odds for Dice Rolls**\n| Roll | Odds |\n|---|---|\n| 6 & 8 | 14% |\nRoll again.\n"
+
+    assert markdown_to_elements(markdown) == [
+        Element(ElementKind.CAPTION, "**Odds for Dice Rolls**", 1),
+        Element(ElementKind.TABLE, "| Roll | Odds |\n|---|---|\n| 6 & 8 | 14% |", 1),
+        Element(ElementKind.PARAGRAPH, "Roll again.", 1),
+    ]
+
+
 def test_markdown_to_elements_continues_the_section_on_a_page_with_no_heading() -> None:
     markdown = (
         "<!-- page 3 -->\n\n## Setup\n\nPlace the board.\n\n<!-- page 4 -->\n\nShuffle the cards.\n"

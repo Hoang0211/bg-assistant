@@ -59,6 +59,14 @@ def test_compare_rulebook_checks_only_pages_with_enough_text() -> None:
     assert [(overlap.page, overlap.kept) for overlap in overlaps] == [(1, 1.0), (3, 0.5)]
 
 
+def test_compare_rulebook_skips_a_page_with_no_words() -> None:
+    symbols = "★ ✦ → ← ☆ " * 3  # over the minimum, but nothing a word could match
+
+    overlaps = compare_rulebook([symbols, "Trade cards."], "<!-- page 2 -->\n\nTrade.\n", 5)
+
+    assert [overlap.page for overlap in overlaps] == [2]
+
+
 def test_compare_rulebook_counts_a_page_missing_from_the_markdown_as_all_missing() -> None:
     overlaps = compare_rulebook(["Roll the dice."], "<!-- page 2 -->\n\nTrade.\n", min_chars=5)
 
@@ -115,8 +123,8 @@ def test_format_text_report_shows_each_rulebook_then_each_page_least_kept_first(
         "- Kept: the share of the text layer's words the Markdown has, so a low share means"
         " dropped text. Added: the Markdown's words the text layer doesn't have: changed or"
         " invented text, or text read from a picture that has no text layer.\n"
-        "- A page with under 100 characters in its text layer (scanned or nearly blank) has"
-        " nothing to compare with and isn't checked.\n"
+        "- A page with under 100 characters in its text layer (scanned or nearly blank), or"
+        " with no words in it, has nothing to compare with and isn't checked.\n"
         "\n"
         "| Rulebook | Pages checked | Kept | Added words |\n"
         "| --- | --: | --: | --: |\n"

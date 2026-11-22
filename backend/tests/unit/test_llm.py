@@ -76,6 +76,20 @@ def test_create_llm_provider_returns_openai_with_a_key() -> None:
     assert isinstance(create_llm_provider(settings), OpenAIProvider)
 
 
+def test_create_llm_provider_gives_the_openai_client_the_timeout_and_retries() -> None:
+    settings = Settings(
+        llm_provider="openai",
+        openai_api_key=SecretStr("sk-test"),
+        llm_timeout_seconds=30,
+        llm_max_retries=5,
+    )
+
+    provider = create_llm_provider(settings)
+
+    assert isinstance(provider, OpenAIProvider)
+    assert (provider._client.max_retries, provider._client.timeout) == (5, 30)
+
+
 def test_create_llm_provider_refuses_openai_without_a_key() -> None:
     settings = Settings(llm_provider="openai", openai_api_key=SecretStr(""))
 

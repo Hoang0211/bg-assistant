@@ -23,7 +23,7 @@ async def test_parse_pdf_to_markdown_writes_the_heading_and_the_text(tmp_path: P
     api_key = get_settings().openai_api_key.get_secret_value()
     llm = OpenAIProvider(AsyncOpenAI(api_key=api_key, max_retries=0))
 
-    markdown = await parse_pdf_to_markdown(path, 1, llm)
+    markdown = await parse_pdf_to_markdown(path, 1, llm, get_settings())
 
     lines = markdown.splitlines()
     assert lines[0] == "<!-- page 1 -->"

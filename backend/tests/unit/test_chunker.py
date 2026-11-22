@@ -675,6 +675,24 @@ def test_chunk_elements_keeps_the_page_range_when_splitting_a_joined_paragraph()
     ]
 
 
+@pytest.mark.parametrize("text", ["**Example:** Anna rolls a 7.", "> Keep it hidden.", "[wood]"])
+def test_chunk_elements_does_not_join_text_that_starts_with_markdown(text: str) -> None:
+    elements = [
+        Element(ElementKind.LIST_ITEM, "- Draw 2 cards", 5),
+        Element(ElementKind.PARAGRAPH, text, 6),
+    ]
+
+    assert chunk_elements(elements, count_words, limits()) == [
+        TextChunk(
+            section_path="",
+            chunk_type=ChunkType.SECTION,
+            page_start=5,
+            page_end=6,
+            content=f"- Draw 2 cards\n\n{text}",
+        ),
+    ]
+
+
 def test_chunk_elements_does_not_join_text_that_starts_with_a_capital() -> None:
     elements = [
         Element(ElementKind.PARAGRAPH, "Grimm Edition", 1),
@@ -1524,6 +1542,22 @@ def test_chunk_elements_drops_sections_with_a_credits_heading(heading: str) -> N
             content="Variants\n\nPlay with two decks.",
         ),
     ]
+
+
+def test_chunk_elements_drops_the_subsections_of_a_credits_section() -> None:
+    elements = [
+        Element(ElementKind.HEADING, "Scoring", 15),
+        Element(ElementKind.PARAGRAPH, "Count your points.", 15),
+        Element(ElementKind.HEADING, "Credits", 16),
+        Element(ElementKind.HEADING, "Credits › Game Design", 16),
+        Element(ElementKind.PARAGRAPH, "Jane Doe", 16),
+        Element(ElementKind.HEADING, "Variants", 16),
+        Element(ElementKind.PARAGRAPH, "Play with open hands.", 16),
+    ]
+
+    sections = [chunk.section_path for chunk in chunk_elements(elements, count_words, limits())]
+
+    assert sections == ["Scoring", "Variants"]
 
 
 def test_chunk_elements_drops_a_credits_section_under_a_parent_heading() -> None:

@@ -2,9 +2,10 @@
 
 import asyncio
 import logging
+import re
 from pathlib import Path
 
-from app.config import get_settings
+from app.config import Settings
 from app.ingestion.pdf_info import render_page
 from app.llm.base import ImagePart, LLMProvider
 
@@ -40,12 +41,22 @@ class TruncatedPageError(Exception):
     """Raised when a page's Markdown reached the output-token cap before it was finished."""
 
 
-async def parse_pdf_to_markdown(path: Path, page_count: int, llm: LLMProvider) -> str:
+# A code fence around a whole reply, which rule 10 forbids but a model sometimes writes anyway.
+_FENCED = re.compile(r"```[\w-]*\n(.*?)\n?```", re.DOTALL)
+
+
+def _without_fence(text: str) -> str:
+    fenced = _FENCED.fullmatch(text)
+    return fenced[1].strip() if fenced else text
+
+
+async def parse_pdf_to_markdown(
+    path: Path, page_count: int, llm: LLMProvider, settings: Settings
+) -> str:
     """Write a PDF as Markdown, one model call per page, each page after a `<!-- page N -->` line.
 
     Pages are sent one at a time, so a failure stops before the remaining pages are paid for.
     """
-    settings = get_settings()
     blocks: list[str] = []
     input_tokens = output_tokens = 0
     for page in range(1, page_count + 1):
@@ -73,7 +84,7 @@ async def parse_pdf_to_markdown(path: Path, page_count: int, llm: LLMProvider) -
             output_tokens,
         )
         blocks.append(f"<!-- page {page} -->")
-        if text := completion.text.strip():
+        if text := _without_fence(completion.text.strip()):
             blocks.append(text)
 
     return "\n\n".join(blocks) + "\n"

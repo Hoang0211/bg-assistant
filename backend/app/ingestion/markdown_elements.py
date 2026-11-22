@@ -17,6 +17,11 @@ def _blocks(markdown: str) -> list[str]:
     current: list[str] = []
     for line in markdown.splitlines():
         if line.strip() and not _HEADING.fullmatch(line) and not _PAGE_MARKER.fullmatch(line):
+            # Table rows and other lines never share a block, even with no blank line between
+            # them, so a caption written right above a table stays a block of its own.
+            if current and current[-1].startswith("|") != line.startswith("|"):
+                blocks.append("\n".join(current))
+                current = []
             current.append(line.rstrip())
             continue
 

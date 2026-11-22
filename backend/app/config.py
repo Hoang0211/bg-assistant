@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     # Seconds before a request to the LLM is given up and retried.
     llm_timeout_seconds: float = 120
 
+    # Times the SDK retries a call after a rate limit, a server error or a dropped connection,
+    # waiting longer before each try.
+    llm_max_retries: int = 2
+
     # The vision model that writes each rulebook page as Markdown, and its reasoning effort.
     # The output cap is a spending guard: the densest page tried needed about 1,900 tokens.
     parser_model: str = "gpt-6.1-terra"

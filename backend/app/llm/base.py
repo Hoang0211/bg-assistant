@@ -83,6 +83,9 @@ def create_llm_provider(settings: Settings) -> LLMProvider:
 
     from app.llm.openai import OpenAIProvider
 
-    # The SDK retries rate limits, server errors and dropped connections twice, with backoff.
-    client = AsyncOpenAI(api_key=api_key, max_retries=2, timeout=settings.llm_timeout_seconds)
+    client = AsyncOpenAI(
+        api_key=api_key,
+        max_retries=settings.llm_max_retries,
+        timeout=settings.llm_timeout_seconds,
+    )
     return OpenAIProvider(client)

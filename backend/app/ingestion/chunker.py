@@ -50,12 +50,15 @@ def _last_page(element: Element) -> int:
 
 
 def _continues(previous: Element, element: Element) -> bool:
+    # The rest of a cut sentence starts with a lowercase letter or a digit; a capital, or
+    # Markdown such as "**Example:**", "> Note" or "[wood]", starts something new.
+    first = element.text[0]
     return (
         previous.kind in (ElementKind.PARAGRAPH, ElementKind.LIST_ITEM)
         and element.kind == ElementKind.PARAGRAPH
         and element.page == _last_page(previous) + 1
         and not previous.text.endswith((".", "!", "?", ":"))
-        and not element.text[0].isupper()
+        and (first.islower() or first.isdigit())
     )
 
 
@@ -134,8 +137,9 @@ def _drop_credits(elements: list[Element]) -> list[Element]:
     dropping = False
     for element in elements:
         if element.kind == ElementKind.HEADING:
-            own_heading = element.text.rsplit(PATH_SEPARATOR, 1)[-1]
-            dropping = bool(_CREDITS_HEADING.fullmatch(own_heading))
+            # Any part of the path, so a subsection under "Credits" goes with it.
+            headings = element.text.split(PATH_SEPARATOR)
+            dropping = any(_CREDITS_HEADING.fullmatch(heading) for heading in headings)
         if not dropping:
             kept.append(element)
     return kept

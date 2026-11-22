@@ -55,5 +55,5 @@ class LlmParser:
 
         if self._llm is None:
             self._llm = create_llm_provider(self._settings)
-        new_markdown = await parse_pdf_to_markdown(path, page_count, self._llm)
+        new_markdown = await parse_pdf_to_markdown(path, page_count, self._llm, self._settings)
         return ParsedRulebook(markdown_to_elements(new_markdown), new_markdown=new_markdown)
